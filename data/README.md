@@ -9,10 +9,12 @@ Datasets for Spot the Spin. Honesty rules: `docs/RULES.md`, section 3. Record fo
 | `raw/semeval2021_task6/` | upstream SemEval-2021 Task 6 files, read-only | no (gitignored) |
 | `dev/semeval21_dev.jsonl` | upstream train + dev, `no_technique` and single-technique examples | yes |
 | `dev/semeval21_dev_multi.jsonl` | upstream train + dev with two or more of our techniques; field `techniques` (list) instead of `technique`, plus `evidence_by_technique` | yes |
-| `dev/fewshot.jsonl` | up to 2 examples per technique, picked deterministically from `dev/semeval21_dev.jsonl` | yes |
+| `dev/headlines_dev.jsonl` | 92 real news headline titles (source `headlines_llm`) labelled by ONE LLM annotator, not humans; dev only (retrieval few-shot and tuning), never mixed into `eval/`. Manifest: `dev/headlines_dev_manifest.json` | yes |
+| `dev/fewshot.jsonl` | the fixed prompt anchors (14 examples: mostly headlines from `headlines_dev.jsonl`, one meme for `changing_subject`) | yes |
 | `dev/semeval21_dev_manifest.json` | dev counts, exclusions, seed, input and output SHA-256 | yes |
 | `staging/eval_v1_candidate/` | **unfrozen** eval candidate from the upstream test split, with `manifest.json` | no (gitignored) |
-| `eval/` | frozen eval sets (`eval_vN/`) | not created yet |
+| `eval/eval_v1/` | frozen: SemEval-2021 Task 6 test split, 135 texts | yes |
+| `eval/eval_v2/` | frozen: `eval_v1` texts unchanged plus 70 real headlines (`headlines_llm`, labelled by one LLM annotator, not humans; a stopgap until two human annotators label a gold set) | yes |
 
 ## Sources and licence
 

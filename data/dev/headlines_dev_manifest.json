@@ -1,0 +1,18 @@
+{
+  "source": "headlines_llm",
+  "file": "headlines_dev.jsonl",
+  "n": 92,
+  "counts_per_technique": {
+    "loaded_language": 28,
+    "appeal_to_fear": 7,
+    "exaggeration_minimization": 3,
+    "doubt": 5,
+    "vague_authority": 3,
+    "changing_subject": 1,
+    "no_technique": 45
+  },
+  "date": "2026-11-15",
+  "annotator": "ONE LLM annotator. NOT human annotation; no second annotator; no kappa.",
+  "protocol": "Real RSS headline titles from 35 outlets, fetched 2026-11-15; labels decided from the text alone; picked by the annotator from a random pool, so not a random sample. DEV ONLY: used for retrieval few-shot and tuning; never mixed into data/eval. Stories already in eval_v2 were excluded.",
+  "sha256": "2d5158576d02f648aadd0e3f6873f887a0485eb5d0c91f2fe0204e00753df5e0"
+}
