@@ -18,6 +18,7 @@ ENV_FILE = REPO_ROOT / ".env"
 DEFAULT_ROUTER_BASE_URL = "https://router.hostinger.com/v1"
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "app.db"
 VALID_CORE_MODES = ("stub", "live")
+DEFAULT_DAILY_TZ = "Europe/Helsinki"
 
 
 @dataclass(frozen=True)
@@ -28,10 +29,44 @@ class Settings:
     db_path: Path = DEFAULT_DB_PATH
     core_models: list[str] = field(default_factory=list)
     public_domain: str = ""
+    # Daily challenge job (see app.scheduler and app.news.daily). Off by default so
+    # tests and local development never start it.
+    daily_job_enabled: bool = False
+    daily_job_hour: int = 0
+    daily_job_minute: int = 0
+    daily_tz: str = DEFAULT_DAILY_TZ
+    # Used only when the IANA data for ``daily_tz`` is missing (slim images): EET.
+    daily_tz_fallback_offset_minutes: int = 120
+    daily_max_clusters: int = 5
+    daily_max_headlines: int = 24
 
 
 def _parse_list(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _parse_bool(name: str, raw: str, default: bool) -> bool:
+    value = raw.strip().lower()
+    if not value:
+        return default
+    if value in ("1", "true", "yes", "on"):
+        return True
+    if value in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"{name} must be true or false")
+
+
+def _parse_int(name: str, raw: str, default: int, low: int, high: int) -> int:
+    value = raw.strip()
+    if not value:
+        return default
+    try:
+        number = int(value)
+    except ValueError:
+        raise ValueError(f"{name} must be an integer") from None
+    if not low <= number <= high:
+        raise ValueError(f"{name} must be between {low} and {high}")
+    return number
 
 
 def _resolve_db_path(raw: str) -> Path:
@@ -60,6 +95,29 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         db_path=_resolve_db_path(environ.get("DB_PATH", "").strip() or str(DEFAULT_DB_PATH)),
         core_models=_parse_list(environ.get("CORE_MODELS", "")),
         public_domain=environ.get("PUBLIC_DOMAIN", "").strip(),
+        daily_job_enabled=_parse_bool(
+            "DAILY_JOB_ENABLED", environ.get("DAILY_JOB_ENABLED", ""), False
+        ),
+        daily_job_hour=_parse_int(
+            "DAILY_JOB_HOUR", environ.get("DAILY_JOB_HOUR", ""), 0, 0, 23
+        ),
+        daily_job_minute=_parse_int(
+            "DAILY_JOB_MINUTE", environ.get("DAILY_JOB_MINUTE", ""), 0, 0, 59
+        ),
+        daily_tz=environ.get("DAILY_TZ", "").strip() or DEFAULT_DAILY_TZ,
+        daily_tz_fallback_offset_minutes=_parse_int(
+            "DAILY_TZ_FALLBACK_OFFSET_MINUTES",
+            environ.get("DAILY_TZ_FALLBACK_OFFSET_MINUTES", ""),
+            120,
+            -14 * 60,
+            14 * 60,
+        ),
+        daily_max_clusters=_parse_int(
+            "DAILY_MAX_CLUSTERS", environ.get("DAILY_MAX_CLUSTERS", ""), 5, 1, 50
+        ),
+        daily_max_headlines=_parse_int(
+            "DAILY_MAX_HEADLINES", environ.get("DAILY_MAX_HEADLINES", ""), 24, 3, 500
+        ),
     )
 
 

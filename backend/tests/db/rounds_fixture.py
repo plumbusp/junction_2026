@@ -54,6 +54,39 @@ def worked_example_items() -> tuple[list[dict], list[Verdict]]:
     return items, refs
 
 
+LIVE_MODELS = ("model-a", "model-b", "model-c")
+
+
+def seed_simple_round(
+    db_path: Path,
+    cluster_id: str,
+    *,
+    n_outlets: int | None = None,
+    published: str = "2026-11-13T10:00:00Z",
+    models: tuple[str, ...] = STUB_MODELS,
+    outlets: tuple[str, ...] = ("Outlet A", "Outlet B", "Outlet C"),
+) -> db.InsertResult:
+    """A ready round of three invented headlines; ``models`` decides its core mode."""
+    items = [
+        {"text": f"{text} ({cluster_id})", "outlet": outlet, "published": published}
+        for text, outlet in zip((LOADED, FEAR, CLEAN), outlets, strict=True)
+    ]
+    refs = [
+        stub_verdict("loaded_language", ["slams"], models=models),
+        stub_verdict("appeal_to_fear", ["drown"], models=models),
+        stub_verdict("no_technique", [], models=models),
+    ]
+    return db.insert_candidate_round(
+        db_path,
+        event=f"Event {cluster_id}",
+        items=items,
+        references=refs,
+        cluster_id=cluster_id,
+        source_note="Test round: invented headlines.",
+        n_outlets=n_outlets,
+    )
+
+
 def seed_worked_example(
     db_path: Path, cluster_id: str = "fare-hike"
 ) -> db.InsertResult:

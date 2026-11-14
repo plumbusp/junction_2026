@@ -19,7 +19,7 @@ import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from app.core.stub import is_stub_verdict
@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS rounds (
     source_note  TEXT NOT NULL DEFAULT '',
     core_mode    TEXT NOT NULL CHECK (core_mode IN ('stub', 'live')),
     status       TEXT NOT NULL CHECK (status IN ('ready', 'ineligible')),
-    created_at   TEXT NOT NULL
+    created_at   TEXT NOT NULL,
+    n_outlets    INTEGER
 );
 CREATE UNIQUE INDEX IF NOT EXISTS rounds_cluster_id
     ON rounds (cluster_id) WHERE cluster_id IS NOT NULL;
@@ -93,6 +94,24 @@ CREATE TABLE IF NOT EXISTS dispute_votes (
     created_at          TEXT NOT NULL,
     PRIMARY KEY (dispute_id, voter_id)
 );
+
+-- One round per local date (in DAILY_TZ) is "the daily challenge".
+CREATE TABLE IF NOT EXISTS daily_challenge (
+    local_date TEXT PRIMARY KEY,
+    round_id   TEXT NOT NULL UNIQUE REFERENCES rounds (round_id),
+    chosen_at  TEXT NOT NULL
+);
+
+-- One row per local date: makes the daily job idempotent across restarts.
+CREATE TABLE IF NOT EXISTS job_runs (
+    run_date    TEXT PRIMARY KEY,
+    started_at  TEXT NOT NULL,
+    finished_at TEXT,
+    status      TEXT NOT NULL CHECK (status IN ('running', 'ok', 'failed')),
+    attempts    INTEGER NOT NULL DEFAULT 1,
+    counts      TEXT NOT NULL DEFAULT '{}',
+    error       TEXT NOT NULL DEFAULT ''
+);
 """
 
 _initialized: set[str] = set()
@@ -103,14 +122,35 @@ def _now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _iso(moment: datetime) -> str:
+    return (
+        moment.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    )
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring a database created by an older version up to date (additive only)."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(rounds)")}
+    if "n_outlets" not in columns:
+        try:
+            conn.execute("ALTER TABLE rounds ADD COLUMN n_outlets INTEGER")
+        except sqlite3.OperationalError:
+            # A second process (the CLI next to the server) added it first.
+            if "n_outlets" not in {
+                row[1] for row in conn.execute("PRAGMA table_info(rounds)")
+            }:
+                raise
+
+
 def init_db(db_path: Path | str) -> None:
-    """Create the parent directory and the schema (idempotent)."""
+    """Create the parent directory and the schema, migrating older databases (idempotent)."""
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=10)
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.commit()
     finally:
         conn.close()
@@ -207,6 +247,7 @@ def insert_candidate_round(
     cluster_id: str | None = None,
     event_date: str | None = None,
     source_note: str = "",
+    n_outlets: int | None = None,
 ) -> InsertResult:
     """Store one candidate event and pick its three in-play headlines.
 
@@ -216,6 +257,9 @@ def insert_candidate_round(
     The round is ``ready`` when ``build_round`` succeeds (three headlines, at least one
     ``no_technique``), else ``ineligible``. Re-inserting a known ``cluster_id`` is a
     no-op that returns the stored round. ``core_mode`` is derived from the verdicts.
+    ``n_outlets`` is the number of distinct outlets of the whole event (it can exceed the
+    stored items when the news job labels only a sample); default: distinct outlets in
+    ``items``. The daily challenge prefers the round with the most outlets.
     """
     if len(items) != len(references):
         raise ValueError("items and references must have the same length")
@@ -269,10 +313,13 @@ def insert_candidate_round(
             reason = "needs three undisputed headlines including a no_technique one"
         status = STATUS_READY if positions else STATUS_INELIGIBLE
         core_mode = "stub" if any(is_stub_verdict(r) for r in references) else "live"
+        if n_outlets is None:
+            n_outlets = len({str(i.get("outlet") or "") for i in items} - {""})
 
         conn.execute(
             "INSERT INTO rounds (round_id, cluster_id, event, event_date, source_note,"
-            " core_mode, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            " core_mode, status, created_at, n_outlets)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 round_id,
                 cluster_id,
@@ -282,6 +329,7 @@ def insert_candidate_round(
                 core_mode,
                 status,
                 _now(),
+                n_outlets,
             ),
         )
         for item_id, item, ref in zip(item_ids, items, references, strict=True):
@@ -379,6 +427,183 @@ def count_in_play(db_path: Path | str, round_id: str) -> int:
             (round_id,),
         ).fetchone()
     return int(row[0])
+
+
+@dataclass(frozen=True)
+class ClusterRound:
+    round_id: str
+    status: str
+    core_mode: str
+
+
+def get_round_by_cluster(db_path: Path | str, cluster_id: str) -> ClusterRound | None:
+    """The round already stored for a news cluster, or None (saves labelling it twice)."""
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT round_id, status, core_mode FROM rounds WHERE cluster_id = ?",
+            (cluster_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return ClusterRound(row["round_id"], row["status"], row["core_mode"])
+
+
+# ---------- Daily challenge ----------
+
+
+def get_daily_challenge(db_path: Path | str, local_date: str) -> str | None:
+    """Round id designated as the daily challenge for ``local_date`` (YYYY-MM-DD), or None."""
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT round_id FROM daily_challenge WHERE local_date = ?", (local_date,)
+        ).fetchone()
+    return row["round_id"] if row else None
+
+
+def pick_daily_challenge(
+    db_path: Path | str,
+    local_date: str,
+    round_ids: Sequence[str],
+    core_mode: str,
+) -> str | None:
+    """Designate the daily challenge for ``local_date`` among ``round_ids``.
+
+    An existing designation for the date is kept and returned, never replaced. Otherwise
+    the choice is the ready round in ``core_mode`` with the most distinct outlets (tie:
+    the freshest headline, then newest insert) that has not been a daily challenge before.
+    Returns None when no round qualifies.
+    """
+    with connect(db_path) as conn:
+        existing = conn.execute(
+            "SELECT round_id FROM daily_challenge WHERE local_date = ?", (local_date,)
+        ).fetchone()
+        if existing is not None:
+            return existing["round_id"]
+        ids = list(dict.fromkeys(round_ids))
+        if not ids:
+            return None
+        marks = ",".join("?" * len(ids))
+        row = conn.execute(
+            f"SELECT r.round_id FROM rounds r WHERE r.round_id IN ({marks})"
+            " AND r.status = ? AND r.core_mode = ?"
+            " AND r.round_id NOT IN (SELECT round_id FROM daily_challenge)"
+            " ORDER BY COALESCE(r.n_outlets, (SELECT COUNT(DISTINCT i.outlet)"
+            "   FROM round_items i WHERE i.round_id = r.round_id AND i.outlet != '')) DESC,"
+            " (SELECT MAX(i.published) FROM round_items i WHERE i.round_id = r.round_id) DESC,"
+            " r.created_at DESC, r.round_id LIMIT 1",
+            (*ids, STATUS_READY, core_mode),
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "INSERT INTO daily_challenge (local_date, round_id, chosen_at)"
+            " VALUES (?, ?, ?)",
+            (local_date, row["round_id"], _now()),
+        )
+    return row["round_id"]
+
+
+# ---------- Job runs (idempotency of the daily job) ----------
+
+JOB_RUNNING = "running"
+JOB_OK = "ok"
+JOB_FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class JobClaim:
+    claimed: bool
+    reason: str  # "claimed", "done", "running", "retry_later" or "exhausted"
+    attempts: int = 0
+    retry_at: datetime | None = None
+
+
+def _parse_iso(value: str) -> datetime:
+    return datetime.fromisoformat(value)  # Python 3.11+ accepts the "Z" suffix
+
+
+def claim_job_run(
+    db_path: Path | str,
+    run_date: str,
+    *,
+    now: datetime,
+    force: bool = False,
+    max_attempts: int = 3,
+    retry_after_seconds: int = 3600,
+    stale_after_seconds: int = 2 * 3600,
+) -> JobClaim:
+    """Atomically start the job for ``run_date`` unless it must not run.
+
+    No row: claimed. ``ok``: "done" (never runs twice for a date). ``running`` and not
+    stale: "running" (another process, for example the CLI next to the server). ``failed``:
+    "exhausted" after ``max_attempts``, "retry_later" until ``retry_after_seconds`` have
+    passed since the last attempt, otherwise claimed again. A ``running`` row older than
+    ``stale_after_seconds`` is a crashed run and is claimed again. ``force`` skips the
+    "done" and attempt checks but never steals a live ``running`` row.
+    """
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT * FROM job_runs WHERE run_date = ?", (run_date,)
+        ).fetchone()
+        attempts = 1
+        if row is not None:
+            attempts = int(row["attempts"]) + 1
+            if row["status"] == JOB_RUNNING:
+                started = _parse_iso(row["started_at"])
+                if (now - started).total_seconds() < stale_after_seconds:
+                    return JobClaim(False, "running", int(row["attempts"]))
+            elif not force:
+                if row["status"] == JOB_OK:
+                    return JobClaim(False, "done", int(row["attempts"]))
+                if int(row["attempts"]) >= max_attempts:
+                    return JobClaim(False, "exhausted", int(row["attempts"]))
+                retry_at = _parse_iso(row["finished_at"] or row["started_at"])
+                retry_at += timedelta(seconds=retry_after_seconds)
+                if now < retry_at:
+                    return JobClaim(
+                        False, "retry_later", int(row["attempts"]), retry_at
+                    )
+        conn.execute(
+            "INSERT INTO job_runs (run_date, started_at, status, attempts)"
+            " VALUES (?, ?, ?, ?) ON CONFLICT (run_date) DO UPDATE SET"
+            " started_at = excluded.started_at, finished_at = NULL,"
+            " status = excluded.status, attempts = excluded.attempts, error = ''",
+            (run_date, _iso(now), JOB_RUNNING, attempts),
+        )
+    return JobClaim(True, "claimed", attempts)
+
+
+def finish_job_run(
+    db_path: Path | str,
+    run_date: str,
+    *,
+    status: str,
+    now: datetime,
+    counts: Mapping[str, object] | None = None,
+    error: str = "",
+) -> None:
+    """Record the end of a claimed run. ``error`` is an error class name, never a message."""
+    if status not in (JOB_OK, JOB_FAILED):
+        raise ValueError("status must be 'ok' or 'failed'")
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE job_runs SET finished_at = ?, status = ?, counts = ?, error = ?"
+            " WHERE run_date = ?",
+            (_iso(now), status, json.dumps(dict(counts or {})), error, run_date),
+        )
+
+
+def get_job_run(db_path: Path | str, run_date: str) -> dict | None:
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM job_runs WHERE run_date = ?", (run_date,)
+        ).fetchone()
+    if row is None:
+        return None
+    data = dict(row)
+    data["counts"] = json.loads(data["counts"])
+    return data
 
 
 # ---------- Answers ----------

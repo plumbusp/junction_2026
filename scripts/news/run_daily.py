@@ -1,10 +1,19 @@
 """Daily news job entry point.
 
-    uv run python scripts/news/run_daily.py --dry-run   # fixtures only, no network
-    uv run python scripts/news/run_daily.py             # live: fetches the configured feeds
+    uv run python scripts/news/run_daily.py --dry-run     # fixtures only, no network
+    uv run python scripts/news/run_daily.py               # live: fetches the configured feeds
+    uv run python scripts/news/run_daily.py --live --seed # full pipeline once for today
 
-Writes data/news/candidates-YYYY-MM-DD.jsonl. Candidates are inputs to human
-labelling, not labels. Database writes are not implemented yet (app.db pending).
+Without --seed this writes data/news/candidates-YYYY-MM-DD.jsonl (inputs to human
+labelling, not labels). With --live --seed it runs the whole daily pipeline once for
+today's local date: fetch, cluster, label with the core in the current CORE_MODE, store
+rounds and designate the daily challenge. That run is recorded in the job_runs table, so
+it is a no-op if today already succeeded (add --force to run again). It prints counts
+only, never headline text. Labelling in CORE_MODE=live calls the paid models.
+
+The production image does not contain scripts/. There use the same pipeline as a module:
+
+    docker exec spotthespin-app-1 python -m app.news.daily [--force]
 """
 
 from __future__ import annotations
@@ -19,7 +28,7 @@ BACKEND = REPO_ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-from app.news import cluster, job
+from app.news import cluster, daily, job
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -53,11 +62,39 @@ def build_parser() -> argparse.ArgumentParser:
         "--window-hours", type=int, default=cluster.DEFAULT_WINDOW_HOURS
     )
     parser.add_argument("--min-outlets", type=int, default=cluster.DEFAULT_MIN_OUTLETS)
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="fetch live feeds (the default without --dry-run); needed with --seed",
+    )
+    parser.add_argument(
+        "--seed",
+        action="store_true",
+        help="label, store rounds and pick the daily challenge (needs --live)",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="with --seed: run even if today's run already succeeded",
+    )
+    parser.add_argument(
+        "--db-path",
+        type=Path,
+        default=None,
+        help="with --seed: SQLite path (default: DB_PATH setting)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.seed:
+        if args.dry_run or not args.live:
+            parser.error("--seed needs --live and cannot be combined with --dry-run")
+        return daily.run_cli(args.db_path, force=args.force)
+    if args.force or args.db_path:
+        parser.error("--force and --db-path only apply with --live --seed")
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
@@ -88,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         for item in cand.items:
             print(f"    - {item.outlet}: {item.title}")
     print(f"written: {result.path}")
-    print("DB integration: pending (app.db not available yet)")
+    print("database: not written (use --live --seed to store rounds)")
     return 0
 
 

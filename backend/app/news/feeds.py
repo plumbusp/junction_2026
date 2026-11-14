@@ -5,8 +5,11 @@ approximated from public media-bias ratings (for example AllSides). It is never
 a judgement about any individual headline, and the UI must show it with that
 caveat (``LEANING_CAVEAT``).
 
-Feed URLs are public RSS/Atom endpoints. They were not live-checked when this
-list was written; the first live run reports any that fail.
+Feed URLs are public RSS/Atom endpoints, live-checked with plain GETs on 2026-11-14
+(all answered and parsed; CBS dates some items a few hours in the future, which the
+window filter simply holds back). Dropped after that check: HuffPost front page (empty
+feed behind a redirect) and the WSJ world feed (frozen since 2025). A feed can still
+break any day: a run reports failed outlets and carries on with the rest.
 """
 
 from __future__ import annotations
@@ -45,12 +48,7 @@ class Feed:
 
 FEEDS: tuple[Feed, ...] = (
     # left
-    Feed(
-        "huffpost",
-        "HuffPost",
-        "https://www.huffpost.com/section/front-page/feed",
-        "left",
-    ),
+    Feed("slate", "Slate", "https://slate.com/feeds/all.rss", "left"),
     # lean left
     Feed(
         "guardian", "The Guardian", "https://www.theguardian.com/world/rss", "lean_left"
@@ -64,12 +62,6 @@ FEEDS: tuple[Feed, ...] = (
         "bbc_news", "BBC News", "https://feeds.bbci.co.uk/news/world/rss.xml", "center"
     ),
     Feed("the_hill", "The Hill", "https://thehill.com/feed/", "center"),
-    Feed(
-        "wsj_world",
-        "The Wall Street Journal",
-        "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
-        "center",
-    ),
     Feed(
         "sky_news",
         "Sky News",

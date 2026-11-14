@@ -8,6 +8,8 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from datetime import date, datetime
+from functools import partial
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -23,6 +25,8 @@ from app.api.errors import (
     install_error_handlers,
 )
 from app.config import REPO_ROOT, Settings, get_settings
+from app.news import daily
+from app.scheduler import Scheduler, utc_now
 from app.security import ssrf
 from app.security.ratelimit import RateLimiter, analyze_limit_from_env
 
@@ -38,7 +42,21 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     if settings.core_mode == "live" and not settings.ai_router_api_key:
         log.warning("CORE_MODE=live without AI_ROUTER_API_KEY: analyze will answer 503")
-    yield
+    scheduler: Scheduler | None = None
+    if settings.daily_job_enabled:
+        scheduler = Scheduler(settings, app.state.daily_runner, clock=app.state.clock)
+        scheduler.start()
+        log.info(
+            "daily job scheduled at %02d:%02d %s",
+            settings.daily_job_hour,
+            settings.daily_job_minute,
+            settings.daily_tz,
+        )
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            await scheduler.stop()
 
 
 def _page_redirect(page: str) -> Callable[[Request], RedirectResponse]:
@@ -59,6 +77,8 @@ def create_app(
     analyze_limit: int | None = None,
     fetch_url: Callable[[str], ssrf.FetchedPage] | None = None,
     frontend_dir: Path = FRONTEND_DIR,
+    daily_runner: Callable[[date], daily.RunOutcome] | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     """Build the app. Keyword arguments are for tests; production uses the defaults."""
     settings = settings or get_settings()
@@ -74,6 +94,10 @@ def create_app(
     app.state.metrics_path = Path(metrics_path or metrics.LATEST_RESULTS)
     app.state.analyze_limiter = RateLimiter(analyze_limit or analyze_limit_from_env())
     app.state.fetch_url = fetch_url or ssrf.fetch_url
+    app.state.clock = clock or utc_now
+    app.state.daily_runner = daily_runner or partial(
+        daily.run_daily_job, settings, app.state.db_path
+    )
 
     install_error_handlers(app)
     for module in (health, round_api, answer, dispute, analyze, metrics):

@@ -7,7 +7,7 @@ Reads one ``candidates-*.jsonl`` file written by ``scripts/news/run_daily.py``, 
 every headline with the one core (``classify``; stub or live per ``CORE_MODE``) and
 inserts each event with ``app.db.insert_candidate_round``. That function drops headlines
 with a disputed reference and keeps the event only if three headlines including a
-``no_technique`` one remain. This is the only way rounds enter the database for now.
+``no_technique`` one remain. This is the manual path; the daily job (``app.news.daily``) does the same from live feeds.
 
 Live mode calls three models per headline and needs ``AI_ROUTER_API_KEY``; run it only
 when live calls are approved. Headline text is not printed.
@@ -31,18 +31,15 @@ from app import db
 from app.config import get_settings, require_live_key
 from app.core.classifier import classify
 from app.core.types import Verdict
+from app.news.job import LIVE_NOTE
+from app.news.job import event_label as _event_label
 
 DRY_RUN_NOTE = "Fixture headlines from fictional test outlets, not real news."
-LIVE_NOTE = (
-    "Real headlines from RSS feeds. An outlet's declared leaning describes the outlet, "
-    "not the headline."
-)
 
 
 def event_label(record: dict) -> str:
     """A neutral event label from the cluster's top terms (never from one headline)."""
-    terms = [str(t) for t in record.get("top_terms", []) if str(t).strip()][:5]
-    return "Keywords: " + ", ".join(terms) if terms else "One event, several outlets"
+    return _event_label(record.get("top_terms", []))
 
 
 def read_candidates(path: Path) -> list[dict]:
@@ -93,6 +90,7 @@ def seed(
                 references=references,
                 cluster_id=record.get("cluster_id"),
                 source_note=note,
+                n_outlets=record.get("n_outlets"),
             )
         )
     return results

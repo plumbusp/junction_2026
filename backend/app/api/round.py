@@ -2,8 +2,10 @@
 
 Rounds come only from the database (``app.db``). Only rounds whose references were
 produced in the current core mode are served, so stub-labelled rounds never appear in
-live mode. With no playable round the endpoint answers 503 ``no_rounds``; headlines are
-never invented.
+live mode. Today's daily challenge (a round designated by the daily job for the current
+date in ``DAILY_TZ``) is served first; without one, or once the player has finished it,
+the newest unfinished round is served. With no playable round the endpoint answers 503
+``no_rounds``; headlines are never invented.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from fastapi import APIRouter, Depends, Request
 from app import db
 from app.api.deps import player_id
 from app.api.errors import ApiError
+from app.scheduler import local_today
 
 router = APIRouter()
 
@@ -41,16 +44,21 @@ def get_round(request: Request, player: str = Depends(player_id)) -> dict:
             "You have played every available round. New rounds arrive with the daily news job.",
         )
 
-    # Newest first: everyone gets the same round of the day until they finish it.
-    stored = db.get_round(state.db_path, open_ids[0])
+    # Today's daily challenge first (it is in round_ids only when labelled in the current
+    # core mode). Otherwise newest first: everyone gets the same round of the day until
+    # they finish it.
+    today = local_today(state.settings, state.clock()).isoformat()
+    daily_id = db.get_daily_challenge(state.db_path, today)
+    is_daily = daily_id is not None and daily_id in open_ids
+    stored = db.get_round(state.db_path, daily_id if is_daily else open_ids[0])
     if stored is None or not stored.items:  # pragma: no cover - ready rounds have items
         raise ApiError(503, "no_rounds", "No rounds are available yet.")
     note = stored.source_note.strip()
     if stored.core_mode == "stub":
         note = f"{note} {STUB_NOTE}".strip()
-    return {
+    body = {
         "round_id": stored.round_id,
-        "date": stored.event_date,
+        "date": today if is_daily else stored.event_date,
         "event": stored.event,
         "source_note": note,
         "items": [
@@ -58,3 +66,6 @@ def get_round(request: Request, player: str = Depends(player_id)) -> dict:
             for item in stored.items
         ],
     }
+    if is_daily:
+        body["daily"] = True
+    return body
