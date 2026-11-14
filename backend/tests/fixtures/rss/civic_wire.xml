@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test fixture: fictional outlet, invented headlines. -->
+<rss version="2.0">
+  <channel>
+    <title>Civic Wire</title>
+    <link>https://civic-wire.example/</link>
+    <description>Fixture feed</description>
+    <item>
+      <title>Central bank hikes interest rates again, squeezing struggling families</title>
+      <link>https://civic-wire.example/economy/central-bank-hike</link>
+      <description>Body text that must never be stored.</description>
+      <pubDate>Fri, 13 Nov 2026 09:15:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Central bank hikes interest rates again, squeezing struggling families</title>
+      <link>https://civic-wire.example/economy/central-bank-hike</link>
+      <pubDate>Fri, 13 Nov 2026 09:15:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Wildfire forces thousands to evacuate in Pine Valley</title>
+      <link>https://civic-wire.example/climate/pine-valley-wildfire</link>
+      <pubDate>Thu, 12 Nov 2026 22:40:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>City council approves new bike lanes downtown</title>
+      <link>https://civic-wire.example/local/bike-lanes</link>
+      <pubDate>Fri, 13 Nov 2026 07:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Government faces backlash over school funding plan</title>
+      <link>https://civic-wire.example/education/school-funding</link>
+      <pubDate>Thu, 12 Nov 2026 14:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Item with a non-web link that must be skipped</title>
+      <link>javascript:alert(1)</link>
+      <pubDate>Fri, 13 Nov 2026 10:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,11 @@
+{
+  "note": "Test fixtures only. Outlets are fictional and headlines are invented; nothing here is real news and none of it may be used for evaluation.",
+  "reference_time": "2026-11-13T18:00:00Z",
+  "feeds": [
+    {"outlet": "civic_wire", "name": "Civic Wire", "file": "civic_wire.xml", "leaning": "left"},
+    {"outlet": "northgate_herald", "name": "Northgate Herald", "file": "northgate_herald.xml", "leaning": "lean_left"},
+    {"outlet": "daily_ledger", "name": "The Daily Ledger", "file": "daily_ledger.xml", "leaning": "center"},
+    {"outlet": "harbor_times", "name": "Harbor Times", "file": "harbor_times.xml", "leaning": "lean_right"},
+    {"outlet": "frontier_post", "name": "Frontier Post", "file": "frontier_post.xml", "leaning": "right"}
+  ]
+}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test fixture: fictional outlet, invented headlines. Atom format. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>The Daily Ledger</title>
+  <id>https://daily-ledger.example/</id>
+  <updated>2026-11-13T12:00:00Z</updated>
+  <entry>
+    <title>Central bank raises interest rates to 4.75% to curb inflation</title>
+    <link href="https://daily-ledger.example/markets/rates-475"/>
+    <id>https://daily-ledger.example/markets/rates-475</id>
+    <updated>2026-11-13T08:00:00Z</updated>
+    <summary>Summary text that must never be stored.</summary>
+  </entry>
+  <entry>
+    <title>Dockworkers strike shuts major ports over pay dispute</title>
+    <link href="https://daily-ledger.example/business/dock-strike"/>
+    <id>https://daily-ledger.example/business/dock-strike</id>
+    <updated>2026-11-13T05:45:00Z</updated>
+  </entry>
+  <entry>
+    <title>Regional vote results certified by election commission</title>
+    <link href="https://daily-ledger.example/politics/certified"/>
+    <id>https://daily-ledger.example/politics/certified</id>
+    <updated>2026-11-09T12:00:00Z</updated>
+  </entry>
+  <entry>
+    <title>Tech giant reports record quarterly profit &amp; job cuts</title>
+    <link href="https://daily-ledger.example/tech/record-profit"/>
+    <id>https://daily-ledger.example/tech/record-profit</id>
+    <updated>2026-11-13T12:00:00Z</updated>
+  </entry>
+</feed>

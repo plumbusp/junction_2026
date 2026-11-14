@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test fixture: fictional outlet, invented headlines. -->
+<rss version="2.0">
+  <channel>
+    <title>Harbor Times</title>
+    <link>https://harbor-times.example/</link>
+    <description>Fixture feed</description>
+    <item>
+      <title>Interest rates rise as central bank warns inflation is sticky</title>
+      <link>https://harbor-times.example/money/rates-rise</link>
+      <pubDate>Fri, 13 Nov 2026 10:05:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Pine Valley wildfire evacuation orders expand overnight</title>
+      <link>https://harbor-times.example/news/pine-valley-evacuation</link>
+      <pubDate>Fri, 13 Nov 2026 04:20:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Star striker signs record transfer deal</title>
+      <link>https://harbor-times.example/sport/record-transfer</link>
+      <pubDate>Thu, 12 Nov 2026 19:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Lawmakers debate border security funding bill</title>
+      <link>https://harbor-times.example/politics/border-bill</link>
+      <pubDate>Fri, 13 Nov 2026 13:30:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

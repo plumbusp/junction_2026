@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test fixture: fictional outlet, invented headlines. -->
+<rss version="2.0">
+  <channel>
+    <title>Northgate Herald</title>
+    <link>https://northgate-herald.example/</link>
+    <description>Fixture feed</description>
+    <item>
+      <title>Port workers walk out in strike over pay and automation</title>
+      <link>https://northgate-herald.example/labour/port-strike</link>
+      <pubDate>Fri, 13 Nov 2026 06:30:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Election commission certifies disputed regional vote results</title>
+      <link>https://northgate-herald.example/politics/vote-certified</link>
+      <pubDate>Mon, 09 Nov 2026 10:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Government unveils new plan for rural broadband</title>
+      <link>https://northgate-herald.example/tech/rural-broadband</link>
+      <pubDate>Fri, 13 Nov 2026 11:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Undated item that must be skipped</title>
+      <link>https://northgate-herald.example/misc/undated</link>
+    </item>
+    <item>
+      <title>Museum returns looted bronze sculptures</title>
+      <link>https://northgate-herald.example/culture/bronzes</link>
+      <pubDate>Thu, 12 Nov 2026 16:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test fixture: fictional outlet, invented headlines. -->
+<rss version="2.0">
+  <channel>
+    <title>Frontier Post</title>
+    <link>https://frontier-post.example/</link>
+    <description>Fixture feed</description>
+    <item>
+      <title>Central bank rate hike: borrowers brace for higher mortgage costs</title>
+      <link>https://frontier-post.example/economy/rate-hike-mortgages</link>
+      <pubDate>Fri, 13 Nov 2026 11:20:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Port strike chaos: union walkout halts shipping at major ports</title>
+      <link>https://frontier-post.example/business/port-strike-chaos</link>
+      <pubDate>Fri, 13 Nov 2026 08:10:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Election commission certifies vote amid fraud claims</title>
+      <link>https://frontier-post.example/politics/certifies-vote</link>
+      <pubDate>Mon, 09 Nov 2026 15:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Heavy snow closes mountain passes in the north</title>
+      <link>https://frontier-post.example/weather/snow-passes</link>
+      <pubDate>Fri, 13 Nov 2026 02:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title><![CDATA[<b>Senate</b> passes defence spending bill]]></title>
+      <link>https://frontier-post.example/politics/defence-bill</link>
+      <pubDate>Thu, 12 Nov 2026 20:30:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
