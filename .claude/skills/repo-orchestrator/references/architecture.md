@@ -1,0 +1,72 @@
+# Proposed architecture (seed for docs/ARCHITECTURE.md)
+
+A starting point, not a law. Once `docs/ARCHITECTURE.md` exists, it wins; change it deliberately and tell affected agents.
+
+## Repo layout
+
+```
+junction_2026/
+├── backend/
+│   ├── app/
+│   │   ├── core/          # the ONE classifier: prompt, model clients, aggregation, cache
+│   │   ├── api/           # FastAPI routers: /api/analyze, /api/round, /api/answer, /api/dispute, /api/metrics
+│   │   ├── game/          # round assembly, scoring (60 + 40 × token-F1)
+│   │   ├── news/          # RSS fetch, event clustering, round-of-the-day job
+│   │   └── db.py          # SQLite: rounds, answers, disputes
+│   ├── eval/              # eval runner + metric functions → results JSON
+│   └── tests/
+├── frontend/              # game, Analyze, /metrics (renders results JSON)
+├── data/
+│   ├── raw/               # downloaded corpora — never committed if the licence forbids it
+│   ├── dev/               # few-shot + prompt tuning
+│   └── eval/              # FROZEN test set, versioned (e.g. eval_v1/)
+├── scripts/               # dataset conversion, gold-set labelling helpers
+├── docs/                  # PLAN.md, STATUS.md, ARCHITECTURE.md
+├── docker-compose.yml
+└── .env.example           # names of secrets only; real .env is gitignored
+```
+
+## Core contract
+
+Every consumer (game, Analyze, /metrics, news job) calls this and nothing else.
+
+```python
+TECHNIQUES = [
+    "loaded_language", "appeal_to_fear", "exaggeration_minimization",
+    "doubt", "vague_authority", "changing_subject", "no_technique",
+]
+
+@dataclass
+class ModelVote:
+    model: str                 # e.g. "claude", "gpt", "deepseek"
+    technique: str             # one of TECHNIQUES
+    evidence_spans: list[str]  # exact substrings of the input text
+    explanation: str
+
+@dataclass
+class Verdict:
+    technique: str             # majority vote; "no_technique" if no majority
+    evidence_spans: list[str]  # spans chosen by >= 2 models
+    explanation: str           # plain language, from a model that voted with the majority
+    agreement: int             # how many models voted for `technique` (0..3)
+    n_models: int              # usually 3
+    disputed: bool             # True when agreement < 2 — not shown as a confident verdict
+    votes: list[ModelVote]
+
+def classify(text: str) -> Verdict: ...
+```
+
+Rules attached to the contract:
+- `evidence_spans` must be exact substrings of `text` (validated; invalid spans are dropped, not invented).
+- Results are cached by hash of normalized text + prompt version.
+- Until the real core exists, `core/stub.py` returns deterministic fake verdicts with the same types, so consumers can be built in parallel.
+
+## Data formats
+
+`data/dev/*.jsonl` and `data/eval/<version>/*.jsonl`, one example per line:
+
+```json
+{"id": "ptc-123-4", "source": "ptc|gold|semeval23", "text": "...", "technique": "appeal_to_fear", "evidence_spans": ["drown", "gridlock"]}
+```
+
+Eval results JSON (written by `backend/eval`, read by the /metrics page) is keyed by source; each entry holds `n`, per-technique P/R/F1 with Wilson intervals, macro-F1, FPR on no_technique, confusion matrix, span token-F1, accuracy by agreement level, per-model results.

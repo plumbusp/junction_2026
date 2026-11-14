@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: bootstrap-empty-repo
+expected_outcome: |
+  The orchestrator bootstraps the project docs (plan, status, architecture with the core contract),
+  picks stage 0 plus stages 1 and 2 as the first work, dispatches several parallel agents with
+  self-contained briefs that have disjoint file ownership and forbid git writes and deployment,
+  gives the user a checklist of manual actions (Hostinger VPS/domain, AI Router key, PTC registration),
+  and does not commit anything — it proposes a commit and asks.

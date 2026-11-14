@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: mid-project-next-cycle
+expected_outcome: |
+  The orchestrator notices docs/STATUS.md is stale (the core classifier exists in the code but the
+  status still says "in progress") and corrects it, then dispatches the next stages that depend on the
+  core — /metrics (eval runner), game and Analyze — as parallel agents with disjoint file ownership,
+  all against the existing classify() contract, with briefs that keep data/eval/ read-only and forbid
+  git writes. It does not commit; it lists changed paths, proposes a commit message and asks.

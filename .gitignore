@@ -1,0 +1,27 @@
+# --- secrets: never commit, never ship ---
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# --- local tooling ---
+.claude/settings.local.json
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+
+# --- data and databases ---
+data/raw/
+*.db
+*.sqlite3
+
+# --- OS ---
+.DS_Store
+Thumbs.db

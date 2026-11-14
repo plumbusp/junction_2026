@@ -1,0 +1,17 @@
+# Keep secrets and local-only files out of every image build.
+# Production secrets are set on the VPS by hand, never copied from the repo.
+.git
+.claude
+docs
+secrets
+.env
+.env.*
+!.env.example
+data/raw
+**/__pycache__
+**/*.pyc
+.venv
+.pytest_cache
+node_modules
+*.db
+*.sqlite3
