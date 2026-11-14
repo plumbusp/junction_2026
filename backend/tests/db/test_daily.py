@@ -107,6 +107,53 @@ def test_daily_pick_prefers_diversity_over_outlets(tmp_db_path: Path) -> None:
     assert picked == diverse.round_id
 
 
+def test_daily_pick_prefers_a_round_with_a_technique_over_a_wider_clean_one(
+    tmp_db_path: Path,
+) -> None:
+    clean_wide = seed_round_with_techniques(
+        tmp_db_path, "clean", ("no_technique",) * 3, n_outlets=20
+    )
+    technique = seed_round_with_techniques(
+        tmp_db_path, "tech", ("no_technique", "no_technique", "doubt"), n_outlets=3
+    )
+    assert not db.round_has_technique(tmp_db_path, clean_wide.round_id)
+    assert db.round_has_technique(tmp_db_path, technique.round_id)
+
+    picked = db.pick_daily_challenge(
+        tmp_db_path, DAY, [clean_wide.round_id, technique.round_id], "stub"
+    )
+
+    assert picked == technique.round_id
+
+
+def test_has_technique_is_the_first_criterion_above_diversity(tmp_db_path: Path) -> None:
+    # Inconsistent rows on purpose: they pin the order of the keys, not real data.
+    clean = seed_round_with_techniques(tmp_db_path, "clean", ("no_technique",) * 3)
+    technique = seed_round_with_techniques(
+        tmp_db_path, "tech", ("no_technique", "doubt", "doubt")
+    )
+    with db.connect(tmp_db_path) as c:
+        c.execute("UPDATE rounds SET diversity = 3 WHERE round_id = ?", (clean.round_id,))
+        c.execute("UPDATE rounds SET diversity = 1 WHERE round_id = ?", (technique.round_id,))
+
+    picked = db.pick_daily_challenge(
+        tmp_db_path, DAY, [clean.round_id, technique.round_id], "stub"
+    )
+
+    assert picked == technique.round_id
+
+
+def test_daily_pick_with_only_clean_rounds_still_sets_the_day(tmp_db_path: Path) -> None:
+    few = seed_round_with_techniques(tmp_db_path, "few", ("no_technique",) * 3, n_outlets=3)
+    many = seed_round_with_techniques(tmp_db_path, "many", ("no_technique",) * 3, n_outlets=9)
+
+    picked = db.pick_daily_challenge(tmp_db_path, DAY, [few.round_id, many.round_id], "stub")
+
+    assert picked == many.round_id  # most outlets, as before
+    assert not db.round_has_technique(tmp_db_path, picked)
+    assert not db.round_has_technique(tmp_db_path, "no-such-round")
+
+
 def test_daily_pick_prefers_techniques_not_used_in_the_last_seven_dailies(
     tmp_db_path: Path,
 ) -> None:

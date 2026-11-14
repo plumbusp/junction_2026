@@ -39,13 +39,13 @@ class Settings:
     daily_tz_fallback_offset_minutes: int = 120
     # Labelling caps (the paid step): clusters per run, headlines per cluster, headlines
     # per run (cluster headlines + lineup pool; the cluster share is split fairly).
-    daily_max_clusters: int = 8
-    daily_max_per_cluster: int = 6
+    daily_max_clusters: int = 12
+    daily_max_per_cluster: int = 8
     daily_max_headlines: int = 200
     # Headlines from the whole in-window list (balanced across outlets) that are labelled
     # as the pool for the "lineup" round (three headlines from three different stories).
-    # 0 disables lineup rounds.
-    daily_lineup_pool: int = 120
+    # 0 (the default) disables lineup rounds: rounds are about one event only.
+    daily_lineup_pool: int = 0
 
 
 def _parse_list(raw: str) -> list[str]:
@@ -120,16 +120,16 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             14 * 60,
         ),
         daily_max_clusters=_parse_int(
-            "DAILY_MAX_CLUSTERS", environ.get("DAILY_MAX_CLUSTERS", ""), 8, 1, 50
+            "DAILY_MAX_CLUSTERS", environ.get("DAILY_MAX_CLUSTERS", ""), 12, 1, 50
         ),
         daily_max_per_cluster=_parse_int(
-            "DAILY_MAX_PER_CLUSTER", environ.get("DAILY_MAX_PER_CLUSTER", ""), 6, 3, 50
+            "DAILY_MAX_PER_CLUSTER", environ.get("DAILY_MAX_PER_CLUSTER", ""), 8, 3, 50
         ),
         daily_max_headlines=_parse_int(
             "DAILY_MAX_HEADLINES", environ.get("DAILY_MAX_HEADLINES", ""), 200, 3, 500
         ),
         daily_lineup_pool=_parse_int(
-            "DAILY_LINEUP_POOL", environ.get("DAILY_LINEUP_POOL", ""), 120, 0, 400
+            "DAILY_LINEUP_POOL", environ.get("DAILY_LINEUP_POOL", ""), 0, 0, 400
         ),
     )
 

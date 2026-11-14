@@ -104,7 +104,7 @@ docker exec spotthespin-app-1 python -m app.news.daily --force    # re-run for t
 docker exec spotthespin-app-1 python -m app.news.daily --rebuild-today   # rebuild today's unanswered rounds and re-pick the daily
 ```
 
-`--rebuild-today` calls the paid models for headlines that are not in the cache. Rounds that already have answers or disputes are kept. If `DAILY_MAX_CLUSTERS`, `DAILY_MAX_PER_CLUSTER` or `DAILY_MAX_HEADLINES` are pinned in the server `.env`, they override the defaults (8 / 6 / 200). `DAILY_LINEUP_POOL` (default 120, 0 disables the mixed "lineup" round) sets how many extra headlines per run are labelled for it. A run can label up to `DAILY_MAX_HEADLINES` headlines (the paid step); the verdict cache keeps re-runs free.
+`--rebuild-today` calls the paid models for headlines that are not in the cache. Rounds that already have answers or disputes are kept. If `DAILY_MAX_CLUSTERS`, `DAILY_MAX_PER_CLUSTER` or `DAILY_MAX_HEADLINES` are pinned in the server `.env`, they override the defaults (12 / 8 / 200). `DAILY_LINEUP_POOL` (default 0 = off) switches on the mixed "lineup" round (three different stories) and sets how many extra headlines per run are labelled for it; if it is set in the server `.env` it overrides the default. A run can label up to `DAILY_MAX_HEADLINES` headlines (the paid step); the verdict cache keeps re-runs free.
 
 The paid verdict cache lives in the volume (`/app/var/cache`, linked from `/app/data/cache`), so redeploys do not re-pay for labelled headlines. Check the run: `docker exec spotthespin-app-1 python -c "import sqlite3;print(sqlite3.connect('/app/var/app.db').execute('select * from job_runs order by 1 desc limit 3').fetchall())"` (counts only, no headline text).
 

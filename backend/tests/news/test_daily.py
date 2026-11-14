@@ -146,6 +146,28 @@ def test_cli_live_seed_prints_counts_only_and_respects_idempotency(
     assert "status: ok" in capsys.readouterr().out and len(pipeline.dates) == 3
 
 
+def test_cli_prints_a_note_when_the_daily_has_no_technique(
+    tmp_db_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def pipeline(db_path, settings, *, local_date, now, **kwargs):
+        return job.LiveRoundsResult(
+            daily_round_id="r-x", daily_diversity=1, daily_has_technique=False
+        )
+
+    monkeypatch.setattr(daily, "get_settings", lambda: Settings(db_path=tmp_db_path))
+    monkeypatch.setattr(
+        daily, "run_daily_job", partial(daily.run_daily_job, pipeline=pipeline)
+    )
+
+    assert daily.run_cli(tmp_db_path) == 0
+
+    out = capsys.readouterr().out
+    assert "daily_has_technique: 0" in out
+    assert "no reference technique" in out
+
+
 def test_cli_seed_needs_live_and_excludes_dry_run() -> None:
     script = _load_run_daily_script()
 

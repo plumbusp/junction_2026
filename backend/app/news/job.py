@@ -8,7 +8,9 @@ Two paths:
   best clusters with the one core (``classify``) and store them as rounds via
   ``app.db.insert_candidate_round``, then designate the daily challenge. It writes no files
   (the production container has no writable data directory) and never logs headline text.
-  It also builds one "lineup" round per day from a wider labelled pool.
+  Rounds are about one event (three headlines of the same story from different outlets).
+  The mixed "lineup" round (three different stories) is built only when
+  ``DAILY_LINEUP_POOL`` is above 0; it is off by default.
 """
 
 from __future__ import annotations
@@ -280,6 +282,9 @@ class LiveRoundsResult:
     lineup_diversity: int | None = None  # distinct techniques in the lineup (None: no lineup)
     daily_round_id: str | None = None
     daily_diversity: int | None = None  # distinct techniques in the daily (None: no daily)
+    # The daily has a reference technique other than no_technique (None: no daily). False
+    # means no ready round of the day had one: nothing is relabelled to force it.
+    daily_has_technique: bool | None = None
     ready_round_ids: list[str] = field(default_factory=list)
 
     def counts(self) -> dict[str, int]:
@@ -304,6 +309,8 @@ class LiveRoundsResult:
             "daily": int(self.daily_round_id is not None),
             # 0 when there is no daily; below 3 means the day's pool lacked variety.
             "daily_diversity": self.daily_diversity or 0,
+            # 0 when there is no daily or the daily shows only clean headlines.
+            "daily_has_technique": int(bool(self.daily_has_technique)),
         }
 
 
@@ -526,9 +533,10 @@ def run_live_rounds(
     many in-window headlines (round-robin across outlets, not already chosen for a cluster,
     within what is left of ``daily_max_headlines``) is labelled too, and one "lineup" round
     (``lineup-<local_date>``: three headlines from three different outlets and, when
-    possible, stories) is built from the cluster and pool headlines. Finally the most
-    diverse, then most novel ready round (event or lineup) is designated the daily
-    challenge for ``local_date``.
+    possible, stories) is built from the cluster and pool headlines (the default pool is 0:
+    event rounds only). Finally the best ready round is designated the daily challenge for
+    ``local_date``: a round with a reference technique other than ``no_technique`` first,
+    then the most diverse, most novel, most outlets, freshest (``db.pick_daily_challenge``).
 
     ``rebuild`` (``--rebuild-today``): once the feeds were fetched and clustered, today's
     unanswered rounds and today's designation are deleted (``db.reset_day``), so their
@@ -656,6 +664,17 @@ def run_live_rounds(
         if inserted.status == db.STATUS_READY:
             pool.append(inserted.round_id)
 
+    if settings.daily_lineup_pool <= 0 and kept:
+        # Lineups are off: an answered lineup kept by --rebuild-today is not a candidate,
+        # except as the last resort when no other round is ready.
+        old_lineup = db.get_round_by_cluster(db_path, lineup_cluster_id(local_date))
+        if (
+            old_lineup is not None
+            and old_lineup.status == db.STATUS_READY
+            and old_lineup.round_id in kept
+        ):
+            fallback.append(old_lineup.round_id)
+            result.n_rounds_existing += 1
     if settings.daily_lineup_pool > 0:
         _lineup_round(
             db_path,
@@ -684,12 +703,20 @@ def run_live_rounds(
     ) or db.pick_daily_challenge(db_path, local_date, fallback, settings.core_mode)
     if result.daily_round_id is not None:
         result.daily_diversity = db.get_round_diversity(db_path, result.daily_round_id)
+        result.daily_has_technique = db.round_has_technique(
+            db_path, result.daily_round_id
+        )
     if (result.n_unlabelled_clusters or result.n_pool_failed) and not (
         result.n_rounds_new or result.n_rounds_existing or result.n_pool_labelled
     ):
         raise LabellingUnavailableError("no cluster could be labelled")
     log.info("daily rounds: %s", result.counts())
-    if result.daily_diversity is not None and result.daily_diversity < 3:
+    if result.daily_has_technique is False:
+        log.warning(
+            "daily challenge has no reference technique: no ready event round of the "
+            "day had one (nothing was relabelled)"
+        )
+    elif result.daily_diversity is not None and result.daily_diversity < 3:
         log.warning(
             "daily challenge has only %d distinct technique(s): the labelled pool "
             "lacked variety",

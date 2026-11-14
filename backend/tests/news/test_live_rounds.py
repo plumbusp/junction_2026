@@ -12,7 +12,7 @@ from app.config import Settings
 from app.core.aggregate import aggregate
 from app.core.stub import stub_classify
 from app.news import job
-from app.news.cluster import Cluster
+from app.news.cluster import Cluster, candidate_clusters, filter_window
 from app.news.feeds import Feed
 from app.news.rss import NewsItem
 
@@ -144,6 +144,95 @@ def test_rounds_use_the_per_cluster_cap_and_record_diversity(
     assert labeller.calls <= 3 * result.n_clusters_used
     assert result.daily_diversity == 3
     assert result.counts()["daily_diversity"] == 3
+
+
+def _widest_cluster_titles() -> frozenset[str]:
+    _, items, now = job.load_fixtures()
+    clusters = candidate_clusters(filter_window(items, now))
+    return frozenset(i.title for i in max(clusters, key=lambda c: c.n_outlets).items)
+
+
+def test_default_settings_build_event_rounds_only(tmp_db_path, fixture_feeds) -> None:
+    feeds, client = fixture_feeds()
+    labeller = Varied()
+
+    result = job.run_live_rounds(
+        tmp_db_path,
+        Settings(core_mode="stub"),  # every labelling setting at its default
+        local_date=DAY,
+        feeds=feeds,
+        client=client,
+        now=FIXTURE_NOW,
+        classify_fn=labeller,
+    )
+
+    assert result.lineup_round_id is None and result.n_pool_labelled == 0
+    assert labeller.calls == result.n_labelled
+    with db.connect(tmp_db_path) as conn:
+        n = conn.execute(
+            "SELECT COUNT(*) FROM rounds WHERE cluster_id LIKE 'lineup-%'"
+        ).fetchone()[0]
+    assert n == 0 and result.n_rounds_new == result.n_candidates
+
+
+def test_daily_takes_the_round_with_a_technique_even_from_a_narrower_event(
+    tmp_db_path, fixture_feeds
+) -> None:
+    widest = _widest_cluster_titles()
+
+    other_calls = [0]
+
+    def clean_in_the_widest(text: str):
+        if text in widest:
+            return stub_verdict("no_technique", [])
+        technique = ("no_technique", "doubt", "loaded_language")[other_calls[0] % 3]
+        other_calls[0] += 1
+        return stub_verdict(technique, [] if technique == "no_technique" else [text.split()[0]])
+
+    result = _run(tmp_db_path, fixture_feeds, clean_in_the_widest)
+
+    assert result.n_ready == 2
+    assert _n_outlets(tmp_db_path, result.daily_round_id) < 4  # not the widest, clean one
+    assert result.daily_has_technique is True
+    assert result.counts()["daily_has_technique"] == 1
+
+
+def test_daily_without_any_technique_is_still_set_and_flagged(
+    tmp_db_path, fixture_feeds, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    result = _run(
+        tmp_db_path, fixture_feeds, lambda text: stub_verdict("no_technique", [])
+    )
+
+    assert result.daily_round_id is not None  # the day is never left empty
+    assert db.get_daily_challenge(tmp_db_path, DAY) == result.daily_round_id
+    assert result.daily_has_technique is False
+    counts = result.counts()
+    assert counts["daily_has_technique"] == 0 and counts["daily_diversity"] == 1
+    assert "no reference technique" in caplog.text
+    _, items, _ = job.load_fixtures()
+    assert not any(item.title in caplog.text for item in items)
+    # Nothing was relabelled: every stored reference is still the clean one.
+    stored = db.get_round(tmp_db_path, result.daily_round_id)
+    assert {i.reference.technique for i in stored.items} == {"no_technique"}
+
+
+def test_selection_is_deterministic_across_identical_runs(
+    tmp_db_path, fixture_feeds
+) -> None:
+    first = _run(tmp_db_path, fixture_feeds, Varied())
+    other = _run(tmp_db_path.with_name("other.db"), fixture_feeds, Varied())
+
+    def shape(path, round_id):
+        stored = db.get_round(path, round_id)
+        return stored.event, [(i.text, i.reference.technique) for i in stored.items]
+
+    assert first.daily_round_id == other.daily_round_id
+    assert shape(tmp_db_path, first.daily_round_id) == shape(
+        tmp_db_path.with_name("other.db"), other.daily_round_id
+    )
 
 
 def test_rebuild_today_replaces_unanswered_rounds_and_keeps_answered_ones(

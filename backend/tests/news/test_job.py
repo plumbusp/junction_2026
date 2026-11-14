@@ -109,7 +109,7 @@ def test_live_path_with_mocked_transport_reports_failed_feed(
 
 
 def test_configured_feeds_are_varied_english_outlets() -> None:
-    assert 8 <= len(FEEDS) <= 15
+    assert 25 <= len(FEEDS) <= 45  # see also test_feeds.py
     assert all(f.language == "en" and f.url.startswith("https://") for f in FEEDS)
     assert {f.leaning for f in FEEDS} == set(LEANINGS)
     with pytest.raises(ValueError):

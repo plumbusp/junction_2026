@@ -164,7 +164,12 @@ def run_cli(
         print(
             f"daily challenge: {outcome.daily_round_id or 'none (no eligible round)'}"
         )
-        if outcome.daily_round_id and (outcome.daily_diversity or 0) < 3:
+        if outcome.daily_round_id and not outcome.counts.get("daily_has_technique", 1):
+            print(
+                "note: the daily has no reference technique: no ready round of today "
+                "had one (nothing was relabelled to force it)"
+            )
+        elif outcome.daily_round_id and (outcome.daily_diversity or 0) < 3:
             print(
                 f"note: the daily has only {outcome.daily_diversity or 0} distinct "
                 "technique(s); today's labelled pool lacked variety"

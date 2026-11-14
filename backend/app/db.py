@@ -24,7 +24,7 @@ from pathlib import Path
 
 from app.core.stub import is_stub_verdict
 from app.core.types import ModelVote, Verdict
-from app.game.rounds import Headline, build_round
+from app.game.rounds import NO_TECHNIQUE, Headline, build_round
 
 STATUS_READY = "ready"
 STATUS_INELIGIBLE = "ineligible"
@@ -532,12 +532,14 @@ def pick_daily_challenge(
 
     An existing designation for the date is kept and returned, never replaced. Otherwise
     the choice is the best ready round in ``core_mode`` that has not been a daily challenge
-    before, ranked by: (a) diversity, the number of distinct reference techniques, higher
-    first; (b) novelty, the number of the round's techniques not used by the previous
-    ``NOVELTY_WINDOW`` daily challenges, higher first; (c) distinct outlets of the event,
-    more first; (d) the freshest headline; then newest insert and id (deterministic).
-    The day is never left empty because diversity is low: the most diverse round wins even
-    below 3 (see ``get_round_diversity``). Returns None only when no round qualifies.
+    before, ranked by: (0) ``has_technique``, a round with at least one reference technique
+    other than ``no_technique`` beats one without; (a) diversity, the number of distinct
+    reference techniques, higher first; (b) novelty, the number of the round's techniques
+    not used by the previous ``NOVELTY_WINDOW`` daily challenges, higher first; (c) distinct
+    outlets of the event, more first; (d) the freshest headline; then newest insert and id
+    (deterministic). The day is never left empty: when no round has a technique, the best
+    round by the remaining criteria is set anyway (see ``round_has_technique``); nothing is
+    relabelled. Returns None only when no round qualifies.
     """
     with connect(db_path) as conn:
         existing = conn.execute(
@@ -567,6 +569,9 @@ def pick_daily_challenge(
         def novelty(row: sqlite3.Row) -> int:
             return len(set(json.loads(row["techniques"] or "[]")) - used)
 
+        def has_technique(row: sqlite3.Row) -> bool:
+            return _has_technique(row["techniques"])
+
         # Stable sorts from the least to the most significant key.
         ranked = sorted(rows, key=lambda r: r["round_id"])
         ranked.sort(key=lambda r: r["created_at"], reverse=True)
@@ -574,6 +579,7 @@ def pick_daily_challenge(
         ranked.sort(key=lambda r: r["outlets"] or 0, reverse=True)
         ranked.sort(key=novelty, reverse=True)
         ranked.sort(key=lambda r: r["diversity"] or 0, reverse=True)
+        ranked.sort(key=has_technique, reverse=True)
         chosen = ranked[0]["round_id"]
         conn.execute(
             "INSERT INTO daily_challenge (local_date, round_id, chosen_at)"
@@ -581,6 +587,20 @@ def pick_daily_challenge(
             (local_date, chosen, _now()),
         )
     return chosen
+
+
+def _has_technique(techniques_json: str | None) -> bool:
+    """True when a stored ``techniques`` list holds a technique other than no_technique."""
+    return any(t != NO_TECHNIQUE for t in json.loads(techniques_json or "[]"))
+
+
+def round_has_technique(db_path: Path | str, round_id: str) -> bool:
+    """Whether a round's in-play references include a technique other than no_technique."""
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT techniques FROM rounds WHERE round_id = ?", (round_id,)
+        ).fetchone()
+    return bool(row) and _has_technique(row["techniques"])
 
 
 def get_round_diversity(db_path: Path | str, round_id: str) -> int | None:

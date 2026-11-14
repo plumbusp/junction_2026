@@ -39,7 +39,13 @@ class ByTitle:
 
 
 def _settings(**overrides) -> Settings:
-    params = {"core_mode": "stub", "daily_max_clusters": 5, "daily_max_headlines": 200}
+    # Lineups are off by default: these tests switch them on explicitly.
+    params = {
+        "core_mode": "stub",
+        "daily_max_clusters": 5,
+        "daily_max_headlines": 200,
+        "daily_lineup_pool": 120,
+    }
     params.update(overrides)
     return Settings(**params)
 
@@ -202,6 +208,42 @@ def test_rebuild_today_replaces_an_unanswered_lineup(
     assert n == 1
 
 
+def test_rebuild_with_lineups_off_removes_an_unanswered_old_lineup(
+    tmp_db_path, fixture_feeds, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(db, "_now", lambda: "2026-11-13T12:00:00Z")  # inside DAY
+    first = _run(tmp_db_path, fixture_feeds, ByTitle(_cluster_titles()))
+    assert first.daily_round_id == first.lineup_round_id  # the old lineup was the daily
+
+    rebuilt = _run(tmp_db_path, fixture_feeds, ByTitle(), rebuild=True, daily_lineup_pool=0)
+
+    assert db.get_round_by_cluster(tmp_db_path, LINEUP_ID) is None
+    assert rebuilt.lineup_round_id is None
+    assert rebuilt.daily_round_id not in (None, first.lineup_round_id)
+
+
+def test_rebuild_with_lineups_off_does_not_repick_an_answered_lineup(
+    tmp_db_path, fixture_feeds, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(db, "_now", lambda: "2026-11-13T12:00:00Z")
+    first = _run(tmp_db_path, fixture_feeds, ByTitle(_cluster_titles()))
+    item = db.get_round(tmp_db_path, first.lineup_round_id).items[0]
+    db.insert_answer(
+        tmp_db_path, player_id="p1", round_id=first.lineup_round_id, item_id=item.item_id,
+        technique="doubt", selected_words=[], technique_points=0, evidence_points=0, total=0,
+    )  # fmt: skip
+
+    rebuilt = _run(tmp_db_path, fixture_feeds, ByTitle(), rebuild=True, daily_lineup_pool=0)
+
+    assert rebuilt.n_rounds_kept == 1
+    assert first.lineup_round_id in db.list_ready_round_ids(tmp_db_path, "stub")  # kept
+    assert rebuilt.daily_round_id not in (None, first.lineup_round_id)
+    # Last resort only: with no event round ready, the kept lineup may be the daily.
+    assert db.pick_daily_challenge(
+        tmp_db_path, "2026-11-20", [first.lineup_round_id], "stub"
+    ) == first.lineup_round_id
+
+
 def test_lineup_pool_zero_disables_lineups(tmp_db_path, fixture_feeds) -> None:
     labeller = ByTitle()
 
@@ -262,8 +304,12 @@ def test_live_mode_refuses_stub_verdicts_in_the_pool(tmp_db_path, fixture_feeds)
 
 
 def test_settings_defaults_and_range_for_the_lineup_pool() -> None:
-    assert load_settings({}).daily_lineup_pool == 120
-    assert load_settings({}).daily_max_headlines == 200
+    defaults = load_settings({})
+    assert defaults.daily_lineup_pool == 0  # event rounds only by default
+    assert Settings().daily_lineup_pool == 0
+    assert defaults.daily_max_headlines == 200
+    assert (defaults.daily_max_clusters, defaults.daily_max_per_cluster) == (12, 8)
+    assert load_settings({"DAILY_LINEUP_POOL": "120"}).daily_lineup_pool == 120
     assert load_settings({"DAILY_LINEUP_POOL": "0"}).daily_lineup_pool == 0
     assert load_settings({"DAILY_LINEUP_POOL": "400"}).daily_lineup_pool == 400
     for bad in ("401", "-1", "many"):
