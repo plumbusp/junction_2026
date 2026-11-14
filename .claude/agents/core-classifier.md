@@ -34,7 +34,7 @@ Read-only for you: `data/dev/fewshot.jsonl` (owned by data-curator). Never read 
    - if no label has at least 2 votes, `technique = "no_technique"` and `disputed = True`;
    - `evidence_spans` = spans chosen by at least 2 models that voted for the final technique;
    - `explanation` comes from a model that voted with the majority. If all models disagree, use a neutral sentence saying the models disagreed. Never copy one model's explanation as the verdict of all of them.
-6. **Prompt** (`prompt.py`): definitions of all six techniques plus `no_technique`; the instruction "when in doubt, answer no_technique"; few-shot examples loaded only from `data/dev/fewshot.jsonl`; a constant `PROMPT_VERSION = "v2"`. The output format is strict JSON.
+6. **Prompt** (`prompt.py`): definitions of all six techniques plus `no_technique`; the instruction "when in doubt, answer no_technique"; few-shot examples loaded only from `data/dev/fewshot.jsonl`; a constant `PROMPT_VERSION` (currently `"v3"`; bump it whenever definitions or instructions change). The output format is strict JSON.
 7. **Cache** (`cache.py`): key = sha256 of (PROMPT_VERSION, normalized text, sorted model IDs). JSON files under `data/cache/`, which is gitignored. A cache hit returns the stored verdict unchanged.
 8. **Stub** (`stub.py`): with `CORE_MODE=stub`, `classify` returns deterministic verdicts with the real types. Use it for every test and for every consumer built in parallel. Stub verdicts must never be written to any results file marked as real.
 9. **Secrets.** Read the key only through `app.config`. Never log it or put it in an exception message.

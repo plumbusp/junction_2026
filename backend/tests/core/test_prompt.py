@@ -49,7 +49,7 @@ def test_prompt_without_fewshot_file_has_definitions_and_rules(tmp_path: Path) -
     system, user = build_messages("Some headline", examples)
 
     assert examples == []
-    assert PROMPT_VERSION == "v2"
+    assert PROMPT_VERSION == "v3"
     assert set(TECHNIQUE_DEFINITIONS) == set(TECHNIQUES)
     for technique in TECHNIQUES:
         assert technique in system["content"]

@@ -41,7 +41,7 @@ Six techniques from the team's presentation, plus "no technique". This is our ow
 | Appeal to fear (`appeal_to_fear`) | pressure through fear | Appeal_to_fear-prejudice |
 | Exaggeration or minimization (`exaggeration_minimization`) | overstating or understating | Exaggeration, Minimisation |
 | Doubt (`doubt`) | hints of doubt without evidence | Doubt |
-| Vague authority (`vague_authority`) | reference to unnamed "experts" | Appeal_to_Authority |
+| Appeal to authority (`vague_authority`) | an authority used instead of evidence, unnamed ("experts say") or named (a famous person's quote as proof); neutral attribution is not it. Broadened on 2026-11-14 to match the SemEval label; the id is kept for compatibility | Appeal_to_Authority |
 | Changing the subject (`changing_subject`) | deflection from the question | Whataboutism, Straw_Men, Red_Herring |
 | No technique (`no_technique`) | ordinary information, no manipulation | — |
 

@@ -18,7 +18,7 @@ from app.core.types import TECHNIQUES
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"  # v3: vague_authority broadened to appeal to authority (2026-11-14)
 
 FEWSHOT_PATH = REPO_ROOT / "data" / "dev" / "fewshot.jsonl"
 EVAL_DIR = REPO_ROOT / "data" / "eval"
@@ -41,8 +41,9 @@ TECHNIQUE_DEFINITIONS: dict[str, str] = {
         "evidence (e.g. 'so-called experts', 'can we really trust ...?')."
     ),
     "vague_authority": (
-        "Vague authority: backing a claim with unnamed or unverifiable authorities "
-        "(e.g. 'experts say', 'scientists warn', 'sources claim') instead of a named source."
+        "Appeal to authority: backing a claim with an authority instead of evidence, "
+        "whether unnamed ('experts say', 'sources claim') or named (a quote from a famous "
+        "person used as proof). Neutral attribution of a fact to its source is not this technique."
     ),
     "changing_subject": (
         "Changing the subject: deflecting from the issue by pointing elsewhere, attacking a "
