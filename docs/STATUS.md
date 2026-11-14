@@ -39,6 +39,7 @@ frontend-builder (mock mode, phase B); eval-metrics (phase C). Next: api-backend
 
 ## Decision log
 
+- 2026-11-15 — **eval_v3 prepared (not yet run live):** eval_v2 files byte-identical plus `ptc_headlines.jsonl`, 332 real news titles from PTC (SemEval-2020 Task 11 train split, CC-BY-4.0, Zenodo 3952415), **human-annotated** by professional annotators: 250 no_technique, 67 loaded_language, 7 doubt, 3 exaggeration_minimization, 3 appeal_to_fear, 1 vague_authority, 1 changing_subject. Same mapping and exclusion rules as SemEval-2021 (excluded: 15 out-of-taxonomy only, 13 multi-technique, 11 duplicate titles). No PTC text in dev or anchors (overlap check: 0). Generator `scripts/data/ptc_headlines_convert.py`. Stub run passes. Front-page track record now prefers this source. Run: `uv run python backend/eval/run.py --eval-version eval_v3`.
 - 2026-11-14 — Ensemble of three models through AI Router. Confidence = share of agreeing models. Reason: three runs of one model give a weak signal.
 - 2026-11-14 — The game, Analyze and /metrics use one core.
 - 2026-11-14 — Secrets only in `.env` and `secrets/`, excluded in `.gitignore` and `.dockerignore`. They are not copied to production from the repository.

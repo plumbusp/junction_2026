@@ -64,7 +64,13 @@ async function onSubmit(ev) {
     return;
   }
   $("analyze-submit").disabled = true;
-  $("analyze-status").textContent = "The desk is reading your text... this can take a few seconds.";
+  const status = $("analyze-status");
+  status.textContent = "The desk is reading your text... this can take a few seconds.";
+  // Live calls take 10-20 s (three models, the slowest decides): say what is happening.
+  const progress = [
+    [5000, "Three different models are reading it independently..."],
+    [11000, "Waiting for the last vote: no single model decides the verdict."],
+  ].map(([ms, text]) => setTimeout(() => { status.textContent = text; }, ms));
   try {
     const mockFile = mockCase === "disputed" ? "analyze_disputed.json" : undefined;
     const verdict = await api("POST", "/api/analyze", v.body, mockFile);
@@ -76,6 +82,7 @@ async function onSubmit(ev) {
     // A 429 (per-minute limit or the daily cap) carries a complete, friendly message: show it as is.
     showError(err.status === 429 ? err.message : `Could not analyze: ${err.message}`);
   } finally {
+    progress.forEach(clearTimeout);
     $("analyze-submit").disabled = false;
   }
 }

@@ -188,7 +188,9 @@ async function loadTrackRecord() {
   try {
     const data = await api("GET", "/api/metrics");
     const sources = data && data.sources ? data.sources : {};
-    const key = Object.keys(sources).find((k) => sources[k] && sources[k].n > 0);
+    // Prefer the source closest to the product: human-labelled news headlines first.
+    const preferred = ["ptc_headlines", ...Object.keys(sources)];
+    const key = preferred.find((k) => sources[k] && sources[k].n > 0);
     body.textContent = "";
     if (!key) {
       body.append(el("p", { text: "No measured results have been published yet." }));

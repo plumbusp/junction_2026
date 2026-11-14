@@ -30,6 +30,7 @@ from app import db
 from app.config import REPO_ROOT, Settings, require_live_key
 from app.core.cache import CACHE_DIR
 from app.core.classifier import classify
+from app.core.clients import ModelCallError, RouterClient
 from app.core.stub import is_stub_verdict
 from app.core.types import Verdict
 from app.game.rounds import LineupHeadline, build_lineup
@@ -318,6 +319,44 @@ def event_label(top_terms: Sequence[str]) -> str:
     """A neutral event label from the cluster's top terms (never from one headline)."""
     terms = [str(t) for t in top_terms if str(t).strip()][:5]
     return "Keywords: " + ", ".join(terms) if terms else "One event, several outlets"
+
+
+EVENT_TITLE_PROMPT = (
+    "Below are news headlines from different outlets about one event. Write a neutral, "
+    "factual label for the event in 3 to 9 words: no opinion, no emotional words, no "
+    "quotes, no final period. Answer with the label only.\n\n"
+)
+EVENT_TITLE_MAX_CHARS = 80
+
+
+def event_title(
+    headlines: Sequence[str],
+    top_terms: Sequence[str],
+    settings: Settings,
+    client: RouterClient | None = None,
+) -> str:
+    """A neutral event label written by one core model from all the cluster's headlines.
+
+    Falls back to ``event_label`` (keywords) outside live mode, on any model error, or when
+    the answer does not look like a short label.
+    """
+    fallback = event_label(top_terms)
+    if settings.core_mode != "live" or not settings.core_models or not headlines:
+        return fallback
+    messages = [{"role": "user", "content": EVENT_TITLE_PROMPT + "\n".join(f"- {h}" for h in headlines)}]
+    try:
+        if client is not None:
+            raw = client.complete(settings.core_models[0], messages)
+        else:
+            with RouterClient(settings.ai_router_base_url, settings.ai_router_api_key) as own:
+                raw = own.complete(settings.core_models[0], messages)
+    except (ModelCallError, httpx.HTTPError) as exc:
+        log.warning("event title: %s, using keywords", exc)
+        return fallback
+    label = " ".join(str(raw).split()).strip().strip("\"'“”‘’").rstrip(".")
+    if not label or len(label) > EVENT_TITLE_MAX_CHARS or not 2 <= len(label.split()) <= 12:
+        return fallback
+    return label
 
 
 def rank_clusters(clusters: Sequence[Cluster]) -> list[Cluster]:
@@ -639,7 +678,7 @@ def run_live_rounds(
             continue
         inserted = db.insert_candidate_round(
             db_path,
-            event=event_label(cluster.top_terms),
+            event=event_title([i.title for i in cluster.items], cluster.top_terms, settings),
             items=[
                 {
                     "text": item.title,
