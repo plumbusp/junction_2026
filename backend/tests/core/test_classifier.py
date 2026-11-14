@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import logging
 from pathlib import Path
 
 import pytest
+from app.core import classifier, retrieval
 from app.core.cache import cache_key
 from app.core.classifier import classify, classify_live, parse_vote
 from app.core.clients import ModelCallError
@@ -187,6 +189,68 @@ def test_changing_fewshot_examples_changes_cache_key(tmp_path: Path) -> None:
     run(second_router, tmp_path, examples=[example])
 
     assert sum(second_router.calls.values()) == 3
+    assert len(list(tmp_path.glob("*.json"))) == 2
+
+
+FIXTURE_DEV = Path(__file__).resolve().parents[1] / "fixtures" / "dev"
+ANCHOR = FewShotExample(text="Anchor headline", technique="no_technique")
+
+
+@pytest.fixture
+def spy_examples(monkeypatch: pytest.MonkeyPatch) -> list[list[FewShotExample]]:
+    """Fixture dev index + one anchor; records the examples handed to the prompt."""
+    monkeypatch.setattr(retrieval, "_index", retrieval.build_index(FIXTURE_DEV))
+    monkeypatch.setattr(classifier, "load_fewshot", lambda: [ANCHOR])
+    seen: list[list[FewShotExample]] = []
+    real = classifier.build_messages
+
+    def spy(text, examples=None):
+        seen.append(list(examples))
+        return real(text, examples)
+
+    monkeypatch.setattr(classifier, "build_messages", spy)
+    return seen
+
+
+def run_retrieval(router: FakeRouter, tmp_path: Path, text: str, **overrides):
+    return classify_live(
+        text,
+        settings=dataclasses.replace(live_settings(), **overrides),
+        client=router.client(),
+        cache_dir=tmp_path,
+    )
+
+
+def test_live_passes_per_text_retrieved_examples_to_the_prompt(
+    tmp_path: Path, spy_examples
+) -> None:
+    replies = {m: answer("no_technique", []) for m in ["model-a", "model-b", "model-c"]}
+
+    run_retrieval(FakeRouter(replies), tmp_path, "Mayor slams parking fees", retrieval_k=2)
+    run_retrieval(FakeRouter(replies), tmp_path, "Flood threat warning", retrieval_k=2)
+    run_retrieval(FakeRouter(replies), tmp_path, "Mayor slams parking fees", fewshot_mode="static")
+
+    first, second, static = spy_examples
+    assert first[0] == ANCHOR and first[1].text == "Mayor slams rip-off parking fees"
+    assert len(first) == 3 and first != second
+    assert second[1].text == "Experts warn city faces deadly flood threat"
+    assert static == [ANCHOR]
+
+
+def test_cache_key_follows_the_retrieved_set(
+    tmp_path: Path, spy_examples, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    replies = {m: answer("no_technique", []) for m in ["model-a", "model-b", "model-c"]}
+    text = "Mayor slams parking fees"
+
+    run_retrieval(FakeRouter(replies), tmp_path, text, retrieval_k=2)
+    same = FakeRouter(replies)
+    run_retrieval(same, tmp_path, text, retrieval_k=2)
+    assert sum(same.calls.values()) == 0  # same retrieved set: cache hit
+
+    other = FakeRouter(replies)
+    run_retrieval(other, tmp_path, text, retrieval_k=1)  # different retrieved set
+    assert sum(other.calls.values()) == 3
     assert len(list(tmp_path.glob("*.json"))) == 2
 
 

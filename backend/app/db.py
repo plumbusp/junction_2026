@@ -115,6 +115,13 @@ CREATE TABLE IF NOT EXISTS job_runs (
     counts      TEXT NOT NULL DEFAULT '{}',
     error       TEXT NOT NULL DEFAULT ''
 );
+
+-- Spend protection for /api/analyze: successful analyses per local date (in DAILY_TZ).
+-- Additive and guarded by IF NOT EXISTS, so older databases gain it on the next start.
+CREATE TABLE IF NOT EXISTS analyze_daily (
+    local_date TEXT PRIMARY KEY,
+    count      INTEGER NOT NULL DEFAULT 0
+);
 """
 
 _initialized: set[str] = set()
@@ -972,3 +979,245 @@ def save_dispute_vote(
                 now,
             ),
         )
+
+
+def get_dispute_by_id(db_path: Path | str, dispute_id: str) -> DisputeRecord | None:
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT item_id FROM disputes WHERE dispute_id = ?", (dispute_id,)
+        ).fetchone()
+        return _get_dispute(conn, row["item_id"]) if row else None
+
+
+def set_dispute_status(
+    db_path: Path | str,
+    dispute_id: str,
+    *,
+    expected: str,
+    status: str,
+    new_technique: str | None = None,
+    new_evidence_spans: Sequence[str] | None = None,
+) -> bool:
+    """Move a dispute from ``expected`` to ``status`` (compare-and-set). False if it moved."""
+    with connect(db_path) as conn:
+        cur = conn.execute(
+            "UPDATE disputes SET status = ?, updated_at = ?,"
+            " new_technique = COALESCE(?, new_technique),"
+            " new_evidence_spans = COALESCE(?, new_evidence_spans)"
+            " WHERE dispute_id = ? AND status = ?",
+            (
+                status,
+                _now(),
+                new_technique,
+                json.dumps(list(new_evidence_spans), ensure_ascii=False)
+                if new_evidence_spans is not None
+                else None,
+                dispute_id,
+                expected,
+            ),
+        )
+        return cur.rowcount == 1
+
+
+@dataclass(frozen=True)
+class DisputeSummary:
+    """One disputed headline for the review tool: ids, counts and techniques only."""
+
+    dispute_id: str
+    round_id: str
+    item_id: str
+    status: str
+    votes: int
+    threshold: int
+    reference_technique: str
+    player_techniques: dict[str, int]  # technique -> number of players who proposed it
+    core_mode: str
+    new_technique: str | None
+    new_evidence_spans: list[str]
+
+
+def list_dispute_summaries(
+    db_path: Path | str, status: str | None = None
+) -> list[DisputeSummary]:
+    """Disputes (optionally of one status), oldest first. No comments, no headline text."""
+    sql = (
+        "SELECT d.*, r.core_mode AS core_mode, i.reference AS reference FROM disputes d"
+        " JOIN round_items i ON i.item_id = d.item_id"
+        " JOIN rounds r ON r.round_id = d.round_id"
+    )
+    args: tuple = ()
+    if status is not None:
+        sql += " WHERE d.status = ?"
+        args = (status,)
+    sql += " ORDER BY d.created_at, d.dispute_id"
+    out: list[DisputeSummary] = []
+    with connect(db_path) as conn:
+        for row in conn.execute(sql, args).fetchall():
+            picks: dict[str, int] = {}
+            for vote in conn.execute(
+                "SELECT player_technique FROM dispute_votes WHERE dispute_id = ?",
+                (row["dispute_id"],),
+            ):
+                picks[vote[0]] = picks.get(vote[0], 0) + 1
+            out.append(
+                DisputeSummary(
+                    dispute_id=row["dispute_id"],
+                    round_id=row["round_id"],
+                    item_id=row["item_id"],
+                    status=row["status"],
+                    votes=sum(picks.values()),
+                    threshold=int(row["threshold"]),
+                    reference_technique=json.loads(row["reference"])["technique"],
+                    player_techniques=dict(
+                        sorted(picks.items(), key=lambda kv: (-kv[1], kv[0]))
+                    ),
+                    core_mode=row["core_mode"],
+                    new_technique=row["new_technique"],
+                    new_evidence_spans=json.loads(row["new_evidence_spans"] or "[]"),
+                )
+            )
+    return out
+
+
+def get_item_text(db_path: Path | str, item_id: str) -> str | None:
+    """The headline text of any stored round item (in play or not), or None."""
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT text FROM round_items WHERE item_id = ?", (item_id,)
+        ).fetchone()
+    return row["text"] if row else None
+
+
+# ---------- Dispute statistics (public, counts only) ----------
+
+
+def dispute_stats(db_path: Path | str, core_mode: str) -> dict:
+    """Aggregate counts of answers and disputes in rounds labelled in ``core_mode``.
+
+    Counts only: no comment text, no player ids, no dispute ids. The reference technique
+    comes from the stored reference of the item, never from what the client sent. Every
+    list is sorted by count (descending), then by technique name, so output is stable.
+    """
+    with connect(db_path) as conn:
+        answers_n = conn.execute(
+            "SELECT COUNT(*) FROM answers a JOIN rounds r ON r.round_id = a.round_id"
+            " WHERE r.core_mode = ?",
+            (core_mode,),
+        ).fetchone()[0]
+        answers_by_ref = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT json_extract(i.reference, '$.technique'), COUNT(*) FROM answers a"
+                " JOIN round_items i ON i.item_id = a.item_id"
+                " JOIN rounds r ON r.round_id = a.round_id WHERE r.core_mode = ?"
+                " GROUP BY 1",
+                (core_mode,),
+            )
+        }
+        status_counts = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT d.status, COUNT(*) FROM disputes d"
+                " JOIN rounds r ON r.round_id = d.round_id WHERE r.core_mode = ?"
+                " GROUP BY d.status",
+                (core_mode,),
+            )
+        }
+        pair_rows = conn.execute(
+            "SELECT json_extract(i.reference, '$.technique'), v.player_technique,"
+            " COUNT(*), COUNT(DISTINCT d.item_id) FROM dispute_votes v"
+            " JOIN disputes d ON d.dispute_id = v.dispute_id"
+            " JOIN round_items i ON i.item_id = d.item_id"
+            " JOIN rounds r ON r.round_id = d.round_id WHERE r.core_mode = ?"
+            " GROUP BY 1, 2",
+            (core_mode,),
+        ).fetchall()
+
+    items_n = sum(status_counts.values())
+    votes_n = sum(row[2] for row in pair_rows)
+    pairs = sorted(
+        (
+            {"reference": r[0], "player": r[1], "votes": r[2], "items": r[3]}
+            for r in pair_rows
+        ),
+        key=lambda p: (-p["votes"], p["reference"], p["player"]),
+    )
+    votes_by_ref: dict[str, int] = {}
+    votes_by_player: dict[str, int] = {}
+    for pair in pairs:
+        votes_by_ref[pair["reference"]] = votes_by_ref.get(pair["reference"], 0) + pair["votes"]
+        votes_by_player[pair["player"]] = votes_by_player.get(pair["player"], 0) + pair["votes"]
+
+    def ordered(counts: dict[str, int]) -> list[tuple[str, int]]:
+        return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+
+    by_reference = [
+        {
+            "technique": technique,
+            "votes": votes,
+            "answers": answers_by_ref.get(technique, 0),
+        }
+        for technique, votes in ordered(votes_by_ref)
+    ]
+    return {
+        "core_mode": core_mode,
+        "answers": {"n": answers_n},
+        "disputes": {"items": items_n, "votes": votes_n},
+        "dispute_rate": {
+            "k": votes_n,
+            "n": answers_n,
+            "value": round(votes_n / answers_n, 4) if answers_n else None,
+        },
+        "by_status": {
+            "n": items_n,
+            **{
+                s: int(status_counts.get(s, 0))
+                for s in ("queued", "in_review", "rescored", "rejected")
+            },
+        },
+        "by_reference": by_reference,
+        "by_player_technique": [
+            {"technique": t, "votes": v} for t, v in ordered(votes_by_player)
+        ],
+        "pairs": pairs,
+    }
+
+
+# ---------- Analyze daily cap (spend protection) ----------
+
+
+def analyze_reserve(db_path: Path | str, local_date: str, cap: int) -> bool:
+    """Take one analysis slot for ``local_date``; False when ``cap`` is already reached.
+
+    ``cap`` 0 means unlimited: nothing is stored and True is returned. The increment is a
+    single conditional UPDATE, so the cap holds even for concurrent requests.
+    """
+    if cap <= 0:
+        return True
+    with connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO analyze_daily (local_date, count) VALUES (?, 0)",
+            (local_date,),
+        )
+        cur = conn.execute(
+            "UPDATE analyze_daily SET count = count + 1 WHERE local_date = ? AND count < ?",
+            (local_date, cap),
+        )
+        return cur.rowcount == 1
+
+
+def analyze_release(db_path: Path | str, local_date: str) -> None:
+    """Give a reserved slot back (the analysis failed, so nothing was spent)."""
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE analyze_daily SET count = count - 1 WHERE local_date = ? AND count > 0",
+            (local_date,),
+        )
+
+
+def analyze_count(db_path: Path | str, local_date: str) -> int:
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT count FROM analyze_daily WHERE local_date = ?", (local_date,)
+        ).fetchone()
+    return int(row["count"]) if row else 0

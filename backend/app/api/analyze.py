@@ -3,13 +3,16 @@
 Body: ``{"text": ...}`` or ``{"url": ...}`` (exactly one). Response: the Verdict fields
 plus ``text`` (the analyzed text), ``source_url`` and ``title`` (URL input only).
 ``evidence_spans`` are strings, each an exact substring of ``text``; the page computes
-offsets itself. Rate-limited per client IP. A core failure answers 503 with a short
+offsets itself. Rate-limited per client IP, and capped globally per local day
+(``ANALYZE_DAILY_CAP``, 429 ``daily_limit``). A core failure answers 503 with a short
 message; the user's text is never logged.
 """
 
 from __future__ import annotations
 
 import logging
+import math
+from datetime import datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -18,6 +21,7 @@ from app import db
 from app.api.deps import client_ip
 from app.api.errors import ApiError
 from app.core.classifier import classify
+from app.scheduler import local_today, settings_tz
 from app.security import ssrf
 
 log = logging.getLogger(__name__)
@@ -58,9 +62,47 @@ def _exact_spans(spans: list, text: str) -> list[str]:
     return [s for s in spans if isinstance(s, str) and s and s in text]
 
 
+def _seconds_until_local_midnight(settings, now: datetime) -> int:
+    tz = settings_tz(settings)
+    local = now.astimezone(tz)
+    midnight = datetime.combine(local.date() + timedelta(days=1), time(0, 0), tzinfo=tz)
+    return max(1, math.ceil((midnight - local).total_seconds()))
+
+
+DAILY_LIMIT_DETAIL = (
+    "Stop the presses: the analysis desk has reached its daily limit and is closed for "
+    "the day. The next edition goes to print at midnight ({tz}), so please come back "
+    "tomorrow. The game and the track record stay open."
+)
+
+
 @router.post("/api/analyze", dependencies=[Depends(rate_limited)])
 def post_analyze(body: AnalyzeIn, request: Request) -> dict:
+    """Spend protection: one slot of the daily cap is taken before any work is done and
+    given back if the analysis fails, so only successful analyses count. The core does
+    not report cache hits, so a cached text counts like any other."""
     state = request.app.state
+    now = state.clock()
+    today = local_today(state.settings, now).isoformat()
+    cap = state.settings.analyze_daily_cap
+    if not db.analyze_reserve(state.db_path, today, cap):
+        raise ApiError(
+            429,
+            "daily_limit",
+            DAILY_LIMIT_DETAIL.format(tz=state.settings.daily_tz),
+            headers={
+                "Retry-After": str(_seconds_until_local_midnight(state.settings, now))
+            },
+        )
+    try:
+        return _analyze(body, state)
+    except BaseException:
+        if cap > 0:
+            db.analyze_release(state.db_path, today)
+        raise
+
+
+def _analyze(body: AnalyzeIn, state) -> dict:
     source_url: str | None = None
     title: str | None = None
     if body.url is not None and body.url.strip():

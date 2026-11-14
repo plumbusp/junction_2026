@@ -24,6 +24,7 @@ from app.core.prompt import (
     fewshot_hash,
     load_fewshot,
 )
+from app.core.retrieval import examples_for_text
 from app.core.stub import stub_classify
 from app.core.types import TECHNIQUES, ModelVote, Verdict
 
@@ -96,7 +97,11 @@ def classify_live(
     cache_dir: Path = CACHE_DIR,
     examples: list[FewShotExample] | None = None,
 ) -> Verdict:
-    """Live ensemble classification. ``client``, ``cache_dir`` and ``examples`` are for tests."""
+    """Live ensemble classification. ``client``, ``cache_dir`` and ``examples`` are for tests.
+
+    ``examples=None`` (the normal case) selects the few-shot examples for this text from
+    ``settings.fewshot_mode`` and ``settings.retrieval_k``.
+    """
     _check_text(text)
     require_live_key(settings)
     models = list(dict.fromkeys(settings.core_models))
@@ -112,7 +117,14 @@ def classify_live(
         )
 
     if examples is None:
-        examples = load_fewshot()
+        # Per-text examples: fixed anchors plus (in retrieval mode) the nearest dev ones.
+        # The cache key below hashes the examples actually used.
+        examples = examples_for_text(
+            text,
+            mode=settings.fewshot_mode,
+            k=settings.retrieval_k,
+            anchors=load_fewshot(),
+        )
     cache = VerdictCache(cache_dir)
     key = cache_key(PROMPT_VERSION, text, models, fewshot_hash(examples))
     cached = cache.get(key)

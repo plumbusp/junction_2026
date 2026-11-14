@@ -73,7 +73,8 @@ async function onSubmit(ev) {
     $("analyze-status").textContent = "Done.";
   } catch (err) {
     $("analyze-status").textContent = "";
-    showError(`Could not analyze: ${err.message}`);
+    // A 429 (per-minute limit or the daily cap) carries a complete, friendly message: show it as is.
+    showError(err.status === 429 ? err.message : `Could not analyze: ${err.message}`);
   } finally {
     $("analyze-submit").disabled = false;
   }

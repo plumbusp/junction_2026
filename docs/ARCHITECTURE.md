@@ -72,6 +72,10 @@ Round rule: a round is the 3 headlines of one event with the maximal number of d
 
 SQLite tables (`app/db.py`): `rounds` (with `n_outlets`, `diversity`, `techniques`), `round_items`, `answers`, `disputes`, `dispute_votes`, `daily_challenge` (one round per local date), `job_runs` (one row per local date; the idempotency guard of the daily job).
 
+## Prompt examples (retrieval few-shot, prompt v4)
+
+Each prompt carries the 14 fixed anchors from `data/dev/fewshot.jsonl` plus the `RETRIEVAL_K` (4) nearest labelled dev examples for that text (`app/core/retrieval.py`: TF-IDF over word unigrams and bigrams, cosine, news-headline boost 0.08, deterministic ties, an example equal to the input is skipped). Dev only: the index refuses anything under `data/eval/`. `FEWSHOT_MODE=static` restores anchors only. The cache key hashes the examples actually used. `backend/eval/dev_check.py` compares modes by leave-one-out on `data/dev/headlines_dev.jsonl` (dev-only results, not an eval). Endpoints added: `GET /api/stats/disputes` (counts only). `POST /api/analyze` has a global daily cap (`ANALYZE_DAILY_CAP`).
+
 ## `GET /api/round` contract (one challenge per local day)
 
 - **Open round:** `{round_id, date, event, source_note, items:[{item_id,text,outlet}]}` plus `daily: true` for today's daily. No references or techniques are revealed. Partial progress continues the same round; answering an item twice is 409.

@@ -4,6 +4,10 @@
 //   mock-banner, masthead-date, radio-toggle, metrics, stub-banner, metrics-status, metrics-error,
 //   metrics-empty, metrics-meta, metrics-sources, known-limitations,
 //   methodology, methodology-models, methodology-per-model
+// Human vs model (GET /api/stats/disputes; mock/dispute_stats.json): human-vs-model, hvm-caption,
+//   hvm-status, hvm-error, hvm-empty, hvm-empty-note, hvm-body, hvm-small-n, hvm-tiles, hvm-rate,
+//   hvm-by-status, hvm-status-table, hvm-by-reference, hvm-reference-table, hvm-pairs,
+//   hvm-pairs-table, hvm-footnote
 // Generated per source <key>: source-<key>, fpr-<key>, per-technique-<key>, confusion-<key>,
 //   calibration-<key>, policies-<key>, human-ceiling-<key>,
 //   per-model-<key> (inside #methodology-per-model: model IDs appear only in the Methodology section)
@@ -297,8 +301,120 @@ function render(data) {
   }
 }
 
+// ---------- Human vs model (player disputes) ----------
+
+const SMALL_VOTES = 30;
+const STATUS_ROWS = [
+  ["queued", "Queued", "waiting for more players to agree"],
+  ["in_review", "In review", "the team is looking at it"],
+  ["rescored", "Rescored", "a reviewer gave a new label; goes to the development set only"],
+  ["rejected", "Rejected", "the reference answer was kept"],
+];
+
+/** k of n as a rate cell group; an interval only when k <= n (a disputed share cannot exceed 100%). */
+function rateCells(k, n, what) {
+  if (!Number.isFinite(k) || !Number.isFinite(n) || n <= 0 || k > n) {
+    return [el("td", { class: "num", text: "n/a" }), el("td", { class: "num", text: `${k ?? "?"} of ${n ?? "?"}` }), el("td", { text: "no interval" }), el("td")];
+  }
+  return propCells({ k, n }, what);
+}
+
+function renderDisputeTiles(stats) {
+  const tiles = $("hvm-tiles");
+  tiles.textContent = "";
+  const rate = stats.dispute_rate || {};
+  tiles.append(tile(
+    "Disputes per answer",
+    Number.isFinite(rate.value) ? pct(rate.value, 1) : "n/a",
+    [`${rate.k} player disputes out of n = ${rate.n} answers`, "how often a player pushes back on the reference answer"],
+    true,
+    "hvm-rate",
+  ));
+  tiles.append(tile("Disputed headlines", String(stats.disputes.items), [`n = ${stats.disputes.votes} player disputes in total`]));
+  tiles.append(tile("Answers given", String(stats.answers.n), [`in rounds labelled by the ${stats.core_mode === "live" ? "live" : stats.core_mode} classifier`]));
+}
+
+function renderDisputeStatus(stats) {
+  const by = stats.by_status || {};
+  const n = by.n ?? 0;
+  const rows = STATUS_ROWS.map(([key, label, note]) => el("tr", {},
+    el("th", { scope: "row", text: label }),
+    el("td", { class: "num", text: `${by[key] ?? 0} of ${n}` }),
+    el("td", { text: note })));
+  const head = [el("th", { scope: "col", text: "Status" }), el("th", { scope: "col", class: "num", text: "Headlines (k of n)" }), el("th", { scope: "col", text: "What it means" })];
+  return el("section", {},
+    el("h3", { text: "Dispute status" }),
+    el("p", { class: "small", text: "One vote changes nothing. A headline goes to review after three different players dispute it, or by a team decision." }),
+    table("hvm-status-table", `Disputed headlines by review status, n = ${n} headlines`, head, rows));
+}
+
+function renderDisputeByReference(stats) {
+  const list = stats.by_reference || [];
+  if (!list.length) return null;
+  const rows = list.map((r) => el("tr", {},
+    el("th", { scope: "row", text: techniqueLabel(r.technique) }),
+    rateCells(r.votes, r.answers, `${techniqueLabel(r.technique)} disputes`)));
+  const head = [el("th", { scope: "col", text: "Reference technique" }), ...propHeaders("Disputed")];
+  return el("section", {},
+    el("h3", { text: "Most disputed reference techniques" }),
+    el("p", { class: "small", text: "Of the answers whose reference was this technique, the share a player disputed." }),
+    table("hvm-reference-table", `Player disputes per reference technique, out of n = ${stats.answers.n} answers in total`, head, rows));
+}
+
+function renderDisputePairs(stats) {
+  const pairs = (stats.pairs || []).slice(0, 8);
+  if (!pairs.length) return null;
+  const total = stats.disputes.votes;
+  const rows = pairs.map((p) => el("tr", {},
+    el("th", { scope: "row", text: techniqueLabel(p.reference) }),
+    el("td", { text: techniqueLabel(p.player) }),
+    el("td", { class: "num", text: `${p.votes} of ${total}` }),
+    el("td", { class: "num", text: String(p.items) })));
+  const head = [el("th", { scope: "col", text: "Reference says" }), el("th", { scope: "col", text: "Player proposed" }),
+    el("th", { scope: "col", class: "num", text: "Disputes (k of n)" }), el("th", { scope: "col", class: "num", text: "Headlines" })];
+  return el("section", {},
+    el("h3", { text: "Where players disagree most" }),
+    el("p", { class: "small", text: "Pairs of reference technique and the technique players proposed instead, most frequent first. The same technique on both sides means the player disputed the evidence words." }),
+    table("hvm-pairs-table", `Most frequent disagreements between the reference and the player's pick, n = ${total} player disputes`, head, rows));
+}
+
+function renderDisputeStats(stats) {
+  const votes = stats.disputes ? stats.disputes.votes : 0;
+  if (!votes) {
+    $("hvm-empty").hidden = false;
+    $("hvm-empty-note").textContent = `Answers given so far: n = ${stats.answers ? stats.answers.n : 0}. Play a clipping and use "I disagree: dispute this call" on the answer screen to add the first one.`;
+    return;
+  }
+  const body = $("hvm-body");
+  body.hidden = false;
+  const small = $("hvm-small-n");
+  small.hidden = votes >= SMALL_VOTES;
+  small.textContent = `n = ${votes} player disputes: a small sample. These counts are anecdotes, not a measurement of the model.`;
+  renderDisputeTiles(stats);
+  ["hvm-by-status", "hvm-by-reference", "hvm-pairs"].forEach((id) => { $(id).textContent = ""; });
+  $("hvm-by-status").append(renderDisputeStatus(stats));
+  const byRef = renderDisputeByReference(stats);
+  if (byRef) $("hvm-by-reference").append(byRef);
+  const pairs = renderDisputePairs(stats);
+  if (pairs) $("hvm-pairs").append(pairs);
+  $("hvm-footnote").hidden = !body.querySelector("td.num") || ![...body.querySelectorAll("td.num")].some((td) => td.textContent.endsWith("*"));
+}
+
+async function loadDisputeStats() {
+  try {
+    const stats = await api("GET", "/api/stats/disputes", undefined, "dispute_stats.json");
+    $("hvm-status").textContent = isMock ? "Showing mock counts." : "";
+    renderDisputeStats(stats);
+  } catch (err) {
+    $("hvm-status").textContent = "";
+    $("hvm-error").hidden = false;
+    $("hvm-error").textContent = `Could not load the dispute counts: ${err.message}`;
+  }
+}
+
 async function init() {
   initPage();
+  loadDisputeStats();
   try {
     const data = await api("GET", "/api/metrics");
     $("metrics-status").textContent = isMock ? "Showing mock results." : "";

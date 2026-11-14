@@ -1,0 +1,31 @@
+{
+  "mock_note": "MOCK DATA for frontend development. These counts are invented. Shape of GET /api/stats/disputes.",
+  "core_mode": "stub",
+  "answers": { "n": 240 },
+  "disputes": { "items": 7, "votes": 18 },
+  "dispute_rate": { "k": 18, "n": 240, "value": 0.075 },
+  "by_status": { "n": 7, "queued": 3, "in_review": 2, "rescored": 1, "rejected": 1 },
+  "by_reference": [
+    { "technique": "loaded_language", "votes": 8, "answers": 70 },
+    { "technique": "no_technique", "votes": 6, "answers": 110 },
+    { "technique": "appeal_to_fear", "votes": 3, "answers": 25 },
+    { "technique": "doubt", "votes": 1, "answers": 20 },
+    { "technique": "vague_authority", "votes": 0, "answers": 15 }
+  ],
+  "by_player_technique": [
+    { "technique": "loaded_language", "votes": 7 },
+    { "technique": "exaggeration_minimization", "votes": 5 },
+    { "technique": "no_technique", "votes": 4 },
+    { "technique": "doubt", "votes": 2 }
+  ],
+  "pairs": [
+    { "reference": "no_technique", "player": "loaded_language", "votes": 5, "items": 2 },
+    { "reference": "loaded_language", "player": "exaggeration_minimization", "votes": 4, "items": 2 },
+    { "reference": "loaded_language", "player": "no_technique", "votes": 3, "items": 1 },
+    { "reference": "appeal_to_fear", "player": "exaggeration_minimization", "votes": 1, "items": 1 },
+    { "reference": "loaded_language", "player": "loaded_language", "votes": 1, "items": 1 },
+    { "reference": "no_technique", "player": "doubt", "votes": 1, "items": 1 },
+    { "reference": "doubt", "player": "no_technique", "votes": 1, "items": 1 },
+    { "reference": "appeal_to_fear", "player": "doubt", "votes": 1, "items": 1 }
+  ]
+}

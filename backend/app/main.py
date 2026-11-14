@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.api import analyze, answer, dispute, health, metrics
+from app.api import analyze, answer, dispute, health, metrics, stats
 from app.api import round as round_api
 from app.api.errors import (
     BodySizeLimitMiddleware,
@@ -79,6 +79,7 @@ def create_app(
     frontend_dir: Path = FRONTEND_DIR,
     daily_runner: Callable[[date], daily.RunOutcome] | None = None,
     clock: Callable[[], datetime] | None = None,
+    stats_ttl: float = stats.DEFAULT_TTL_SECONDS,
 ) -> FastAPI:
     """Build the app. Keyword arguments are for tests; production uses the defaults."""
     settings = settings or get_settings()
@@ -95,12 +96,13 @@ def create_app(
     app.state.analyze_limiter = RateLimiter(analyze_limit or analyze_limit_from_env())
     app.state.fetch_url = fetch_url or ssrf.fetch_url
     app.state.clock = clock or utc_now
+    app.state.stats_cache = stats.StatsCache(stats_ttl)
     app.state.daily_runner = daily_runner or partial(
         daily.run_daily_job, settings, app.state.db_path
     )
 
     install_error_handlers(app)
-    for module in (health, round_api, answer, dispute, analyze, metrics):
+    for module in (health, round_api, answer, dispute, analyze, metrics, stats):
         app.include_router(module.router)
     for page in PAGES:
         app.add_api_route(

@@ -1,8 +1,10 @@
 """Prompt for the ensemble classifier.
 
-Few-shot examples come only from ``data/dev/fewshot.jsonl`` (owned by data-curator).
+Few-shot examples are the fixed anchors from ``data/dev/fewshot.jsonl`` plus, per input
+text, the nearest labelled examples from ``data/dev/`` (see ``app.core.retrieval``).
 The frozen test set under ``data/eval/`` is never read here. ``fewshot_hash`` of the
-loaded examples is part of the cache key, so a few-shot change invalidates the cache.
+examples actually used is part of the cache key, so a different example set never
+reuses a cached verdict.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from app.core.types import TECHNIQUES
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v3"  # v3: vague_authority broadened to appeal to authority (2026-11-14)
+PROMPT_VERSION = "v4"  # v4: retrieval few-shot (anchors + nearest dev examples per text)
 
 FEWSHOT_PATH = REPO_ROOT / "data" / "dev" / "fewshot.jsonl"
 EVAL_DIR = REPO_ROOT / "data" / "eval"
@@ -87,14 +89,19 @@ def _is_under(path: Path, parent: Path) -> bool:
     return True
 
 
+def refuse_eval_path(path: Path) -> None:
+    """Raise ValueError for any path inside the frozen ``data/eval/`` (checked before any I/O)."""
+    if _is_under(path, EVAL_DIR):
+        raise ValueError("examples must never come from data/eval/")
+
+
 def load_fewshot(path: Path = FEWSHOT_PATH) -> list[FewShotExample]:
     """Load few-shot examples from a dev JSONL file.
 
     A missing file gives zero examples. Invalid lines are skipped and logged by line
     number only. Paths inside ``data/eval/`` are refused.
     """
-    if _is_under(path, EVAL_DIR):
-        raise ValueError("few-shot examples must never come from data/eval/")
+    refuse_eval_path(path)
     if not path.is_file():
         return []
 

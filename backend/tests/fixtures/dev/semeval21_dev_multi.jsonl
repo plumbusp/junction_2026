@@ -1,0 +1,1 @@
+{"id": "multi-1", "source": "semeval21", "text": "Multi label text that must never be indexed", "techniques": ["doubt", "loaded_language"]}

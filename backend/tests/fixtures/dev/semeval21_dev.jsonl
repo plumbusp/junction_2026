@@ -1,0 +1,4 @@
+{"id": "sem-1", "source": "semeval21", "text": "PARKING FEES ARE A TOTAL RIP-OFF AND THE MAYOR IS A THIEF", "technique": "loaded_language", "evidence_spans": ["RIP-OFF", "THIEF"]}
+{"id": "sem-2", "source": "semeval21", "text": "Flood waters will drown the city if you do nothing", "technique": "appeal_to_fear", "evidence_spans": ["drown the city"]}
+{"id": "sem-3", "source": "semeval21", "text": "The council approved the budget on Tuesday", "technique": "no_technique", "evidence_spans": []}
+{"id": "sem-4", "source": "semeval21", "text": "This is the worst crisis ever seen anywhere", "technique": "exaggeration_minimization", "evidence_spans": ["the worst crisis ever"]}

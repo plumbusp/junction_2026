@@ -23,6 +23,7 @@ data/news/
 data/cache/
 data/staging/
 backend/eval/results/stub/
+backend/eval/results/dev/
 *.db
 *.sqlite3
 

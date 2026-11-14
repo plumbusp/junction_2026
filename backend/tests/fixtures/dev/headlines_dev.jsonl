@@ -1,0 +1,7 @@
+{"id": "hl-1", "source": "headlines_llm", "text": "Mayor slams rip-off parking fees", "technique": "loaded_language", "evidence_spans": ["slams", "rip-off"], "outlet": "Example Wire"}
+{"id": "hl-2", "source": "headlines_llm", "text": "Experts warn city faces deadly flood threat", "technique": "appeal_to_fear", "evidence_spans": ["deadly flood threat"], "outlet": "Example Wire"}
+{"id": "hl-3", "source": "headlines_llm", "text": "Council approves parking budget for next year", "technique": "no_technique", "evidence_spans": [], "outlet": "Example Wire"}
+{"id": "hl-4", "source": "headlines_llm", "text": "So-called experts claim the budget is balanced", "technique": "doubt", "evidence_spans": ["So-called experts"], "outlet": "Example Wire"}
+{"id": "hl-5", "source": "headlines_llm", "text": "Minister calls overrun a minor glitch", "technique": "exaggeration_minimization", "evidence_spans": ["minor glitch"], "outlet": "Example Wire"}
+{"id": "hl-6", "source": "headlines_llm", "text": "But what about the previous government's budget?", "technique": "changing_subject", "evidence_spans": ["But what about"], "outlet": "Example Wire"}
+{"id": "hl-7", "source": "headlines_llm", "text": "Sources confirm the plan will work, officials say", "technique": "vague_authority", "evidence_spans": ["Sources confirm"], "outlet": "Example Wire"}

@@ -59,7 +59,7 @@
       <details class="howto">
         <summary><strong>How to read this page</strong></summary>
         <ul>
-          <li><strong>False-positive rate (FPR) on "no technique"</strong>: of the texts that human annotators labelled as ordinary information, the share the system flagged with some technique. Lower is better. This is the number that tells you how often an honest headline gets wrongly accused.</li>
+          <li><strong>False-positive rate (FPR) on "no technique"</strong>: of the texts that the source's annotators labelled as ordinary information (human annotators for SemEval, a single LLM annotator for the real-headline source), the share the system flagged with some technique. Lower is better. This is the number that tells you how often an honest headline gets wrongly accused.</li>
           <li><strong>Precision</strong> of a technique: of the texts the system labelled with it, the share that really have it. <strong>Recall</strong>: of the texts that really have it, the share the system found.</li>
           <li><strong>Wilson interval</strong>: the 95% range where the true value plausibly lies given n. Small n gives wide intervals: do not over-read differences whose intervals overlap.</li>
           <li><strong>Confidence</strong> (High, Moderate, Disputed) is how strongly the system agrees with itself; it is not a probability. The calibration table checks whether "High" really is more accurate than "Moderate". See Methodology below.</li>
@@ -69,6 +69,25 @@
     </div>
 
     <div id="metrics-sources"></div>
+
+    <section id="human-vs-model" class="paper sheet" aria-labelledby="h-hvm">
+      <h2 id="h-hvm">Human vs model</h2>
+      <p id="hvm-caption" class="lead">After each clipping, players can dispute the reference answer. A dispute is one player's opinion, not a label: it changes no reference answer and none of the numbers above. Disputes that survive a team review are added to the development set only, never to the frozen test set. Counts only: comments and player identities are never shown.</p>
+      <p id="hvm-status" class="status" role="status" aria-live="polite">Loading dispute counts...</p>
+      <div id="hvm-error" class="error" role="alert" hidden></div>
+      <div id="hvm-empty" class="empty-state" hidden>
+        <strong>No player has disputed an answer yet.</strong>
+        <p id="hvm-empty-note"></p>
+      </div>
+      <div id="hvm-body" hidden>
+        <p id="hvm-small-n" class="banner banner-warn" hidden></p>
+        <div id="hvm-tiles" class="tiles"></div>
+        <div id="hvm-by-status"></div>
+        <div id="hvm-by-reference"></div>
+        <div id="hvm-pairs"></div>
+        <p id="hvm-footnote" class="small muted" hidden>* interval computed in the browser from k and n (Wilson, 95%). Disputes per answer are not independent trials, so read the interval as a rough guide.</p>
+      </div>
+    </section>
 
     <section class="paper sheet" aria-labelledby="h-limitations">
       <h2 id="h-limitations">Known limitations</h2>

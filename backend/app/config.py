@@ -19,6 +19,9 @@ DEFAULT_ROUTER_BASE_URL = "https://router.hostinger.com/v1"
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "app.db"
 VALID_CORE_MODES = ("stub", "live")
 DEFAULT_DAILY_TZ = "Europe/Helsinki"
+VALID_FEWSHOT_MODES = ("retrieval", "static")
+DEFAULT_RETRIEVAL_K = 4
+MAX_RETRIEVAL_K = 12
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,14 @@ class Settings:
     # as the pool for the "lineup" round (three headlines from three different stories).
     # 0 (the default) disables lineup rounds: rounds are about one event only.
     daily_lineup_pool: int = 0
+    # Spend protection: successful /api/analyze calls per local day in ``daily_tz`` across
+    # all visitors (each call costs three model requests). 0 means unlimited.
+    analyze_daily_cap: int = 500
+    # Few-shot examples: "retrieval" = fixed anchors + the nearest labelled dev examples
+    # for each text; "static" = the fixed anchors only (the old behaviour, for ablations).
+    fewshot_mode: str = "retrieval"
+    # Nearest dev examples added after the anchors (0 = anchors only).
+    retrieval_k: int = DEFAULT_RETRIEVAL_K
 
 
 def _parse_list(raw: str) -> list[str]:
@@ -95,8 +106,22 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     if core_mode not in VALID_CORE_MODES:
         raise ValueError(f"CORE_MODE must be one of {VALID_CORE_MODES}, got {core_mode!r}")
 
+    fewshot_mode = environ.get("FEWSHOT_MODE", "").strip().lower() or "retrieval"
+    if fewshot_mode not in VALID_FEWSHOT_MODES:
+        raise ValueError(
+            f"FEWSHOT_MODE must be one of {VALID_FEWSHOT_MODES}, got {fewshot_mode!r}"
+        )
+
     return Settings(
         core_mode=core_mode,
+        fewshot_mode=fewshot_mode,
+        retrieval_k=_parse_int(
+            "RETRIEVAL_K",
+            environ.get("RETRIEVAL_K", ""),
+            DEFAULT_RETRIEVAL_K,
+            0,
+            MAX_RETRIEVAL_K,
+        ),
         ai_router_base_url=environ.get("AI_ROUTER_BASE_URL", DEFAULT_ROUTER_BASE_URL).strip(),
         ai_router_api_key=environ.get("AI_ROUTER_API_KEY", "").strip(),
         db_path=_resolve_db_path(environ.get("DB_PATH", "").strip() or str(DEFAULT_DB_PATH)),
@@ -130,6 +155,9 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         ),
         daily_lineup_pool=_parse_int(
             "DAILY_LINEUP_POOL", environ.get("DAILY_LINEUP_POOL", ""), 0, 0, 400
+        ),
+        analyze_daily_cap=_parse_int(
+            "ANALYZE_DAILY_CAP", environ.get("ANALYZE_DAILY_CAP", ""), 500, 0, 1_000_000
         ),
     )
 
