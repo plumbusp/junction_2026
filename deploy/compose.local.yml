@@ -1,0 +1,18 @@
+# Local-only override. Never used on the VPS.
+#
+# Publishes the app on 127.0.0.1:8000 and forces stub mode, so the production
+# compose file stays untouched.
+#
+# From the repo root:
+#   docker compose --env-file deploy/local.env \
+#     -f docker-compose.yml -f deploy/compose.local.yml up --build -d
+#   bash .claude/skills/run-app/scripts/smoke.sh http://127.0.0.1:8000
+#   docker compose --env-file deploy/local.env \
+#     -f docker-compose.yml -f deploy/compose.local.yml down
+
+services:
+  app:
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      CORE_MODE: stub

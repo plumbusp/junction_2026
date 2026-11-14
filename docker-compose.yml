@@ -1,0 +1,51 @@
+# Spot the Spin on the Hostinger VPS, behind Hostinger's Traefik.
+#
+# No ports are published. Traefik runs with network mode "host" on the VPS and
+# reaches the container on its default project network, routed by the labels
+# below (same pattern as /opt/spotthespin/hello, which has no networks section).
+#
+# Interpolated variables (values come from the file passed with --env-file, or
+# from the shell; defaults shown):
+#   PUBLIC_DOMAIN    srv2160832.hstgr.cloud          Host() rule of the router
+#   APP_ENV_FILE     /opt/spotthespin/app/.env       app environment (secrets)
+#   APP_IMAGE        spotthespin-app                 image name
+#   APP_TAG          latest                          image tag (git sha on deploy)
+#
+# Never run "docker compose config" against the production env file in a shared
+# terminal: it prints the values from env_file. See docs/DEPLOY.md.
+
+name: spotthespin
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${APP_IMAGE:-spotthespin-app}:${APP_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - path: ${APP_ENV_FILE:-/opt/spotthespin/app/.env}
+        required: true
+    environment:
+      # Fixed inside the container: the named volume below is mounted here.
+      DB_PATH: /app/var/app.db
+    volumes:
+      # SQLite only. Not /app/data, so data/dev/ from the image stays current.
+      - app-data:/app/var
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.spotthespin.rule=Host(`${PUBLIC_DOMAIN:-srv2160832.hstgr.cloud}`)
+      - traefik.http.routers.spotthespin.entrypoints=websecure
+      - traefik.http.routers.spotthespin.tls.certresolver=letsencrypt
+      - traefik.http.services.spotthespin.loadbalancer.server.port=8000
+
+volumes:
+  # Holds the SQLite database. Never remove it (no "down -v").
+  app-data:

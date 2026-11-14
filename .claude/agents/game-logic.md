@@ -23,7 +23,7 @@ You implement the rules of the game as pure, testable functions. The API and the
 ## Scoring (exact)
 - **Technique**: 60 if the player's technique equals the reference technique, else 0.
 - **Evidence**: `40 * token_f1(player_words, reference_spans)`, rounded to the nearest integer, halves rounded up. Evidence is scored independently of the technique choice: a wrong technique can still earn evidence points.
-- **Token-F1**: lowercase, split on non-letter and non-digit characters, multiset overlap. Precision = overlap / player tokens, recall = overlap / reference tokens, F1 = harmonic mean. Empty player selection with empty reference gives 1.0; empty on one side only gives 0.0.
+- **Token-F1**: lowercase, split on non-letter and non-digit characters (a hyphen between two letters or digits stays inside the token, so "rip-off" is one token), multiset overlap. Precision = overlap / player tokens, recall = overlap / reference tokens, F1 = harmonic mean. Empty player selection with empty reference gives 1.0; empty on one side only gives 0.0.
 - **Special case**: reference `no_technique` and the player selected no words gives the full 40 evidence points.
 - **Headline score** = technique + evidence (0 to 100).
 - **Round score** = mean of the three headline scores, rounded to the nearest integer, halves up.

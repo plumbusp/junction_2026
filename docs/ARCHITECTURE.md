@@ -61,6 +61,12 @@ Rules attached to the contract:
 - Results are cached by hash of normalized text + prompt version.
 - Until the real core exists, `core/stub.py` returns deterministic fake verdicts with the same types, so consumers can be built in parallel.
 
+## Deployment facts attached to the contract
+
+- The app serves `GET /health` and `GET /api/health` (both 200 when the process is up); the container health check accepts either.
+- Traefik on the VPS runs in host network mode, so the app compose needs no shared Docker network: labels only, like the hello-world.
+- The image contains `backend/`, `frontend/` and `data/dev/` (few-shot at runtime). `data/eval/`, `data/raw/` and all secrets stay out of the image.
+
 ## Game rules attached to the contract
 
 - Tokenizer (`app.game.scoring.tokenize`, also used by eval for span token-F1 and by the game page for clickable words): lowercase, split on characters that are not letters or digits, except that a hyphen between two letters or digits stays inside the token ("rip-off" is one token). This keeps the PLAN worked example at 87.

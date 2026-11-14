@@ -1,17 +1,53 @@
 # Keep secrets and local-only files out of every image build.
 # Production secrets are set on the VPS by hand, never copied from the repo.
+#
+# Allowlist: ignore everything, then re-include only what the image needs.
+# The deny list below is applied after the allowlist (last match wins), so a
+# secret inside a re-included directory is still excluded.
+*
+!pyproject.toml
+!uv.lock
+!backend/
+!frontend/
+# data/ stays out, except data/dev/ (few-shot examples the core loads at runtime).
+# data/raw, data/news and the frozen data/eval never enter the image.
+data
+!data/dev/
+!data/dev/**
+data/raw
+data/news
+data/eval
+
+# --- deny list (keep even though * already covers most of it) ---
 .git
 .claude
 docs
 secrets
+**/secrets
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
-data/raw
+*.pem
+*.key
+**/*.pem
+**/*.key
+**/id_rsa*
+**/id_ed25519*
+backend/tests
 **/__pycache__
 **/*.pyc
 .venv
+**/.venv
 .pytest_cache
+**/.pytest_cache
+.ruff_cache
+**/.ruff_cache
 node_modules
+**/node_modules
 *.db
 *.sqlite3
+**/*.db
+**/*.sqlite3
+deploy
