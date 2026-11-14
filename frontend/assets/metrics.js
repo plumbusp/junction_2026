@@ -1,4 +1,4 @@
-// Spot the Spin - /metrics page (frontend/metrics/index.html).
+// no i am not brainwashed - /metrics page (frontend/metrics/index.html).
 //
 // Required element IDs (the smoke check relies on these):
 //   mock-banner, masthead-date, radio-toggle, metrics, stub-banner, metrics-status, metrics-error,

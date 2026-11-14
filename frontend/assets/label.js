@@ -1,4 +1,4 @@
-// Spot the Spin - offline labelling helper (frontend/label/index.html).
+// no i am not brainwashed - offline labelling helper (frontend/label/index.html).
 // Classic script with no imports and no network calls, so the page also works when opened from disk.
 //
 // Required element IDs (the smoke check relies on these):

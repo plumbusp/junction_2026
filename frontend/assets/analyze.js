@@ -1,4 +1,4 @@
-// Spot the Spin - Analyze page (frontend/analyze/index.html).
+// no i am not brainwashed - Analyze page (frontend/analyze/index.html).
 //
 // Required element IDs (the smoke check relies on these):
 //   mock-banner, masthead-date, radio-toggle, analyze, analyze-form, mode-text, mode-url, analyze-text,

@@ -1,4 +1,4 @@
-// Spot the Spin - "The Spin Gazette" background radio (frontend/assets/radio.js).
+// no i am not brainwashed - "no i am not brainwashed" background radio (frontend/assets/radio.js).
 // Classic script (no imports, no network): included on every page, including the offline label page.
 //
 // Required element ID: radio-toggle (a <button aria-pressed> with a .radio-state child).

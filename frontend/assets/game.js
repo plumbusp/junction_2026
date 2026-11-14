@@ -1,4 +1,4 @@
-// Spot the Spin - game page (frontend/index.html).
+// no i am not brainwashed - game page (frontend/index.html).
 //
 // Required element IDs (the smoke check relies on these):
 //   mock-banner, masthead-date, radio-toggle, game, step-indicator, game-status, game-error,

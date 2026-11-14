@@ -1,4 +1,4 @@
-// Spot the Spin - shared helpers for the game, Analyze and /metrics pages (ES module).
+// no i am not brainwashed - shared helpers for the game, Analyze and /metrics pages (ES module).
 //
 // Mock mode: add ?mock=1 to any page URL. Requests are then answered from
 // frontend/mock/*.json instead of the API. The mock files are the reference

@@ -1,8 +1,8 @@
-# Spot the Spin — junction_2026
+# no i am not brainwashed — junction_2026
 
 Project for the **Junction 2026** hackathon, **Hostinger** challenge: "Build an AI-powered tool that detects propaganda, bots and bad actors online, and deploy it live on Hostinger's infrastructure."
 
-Our direction is **Name the technique**: a classifier that finds manipulation techniques in news headlines and explains each verdict in plain language. Around it we build the game **Spot the Spin**, where players learn to see manipulation, and the correct answer, score and system confidence are shown at every step.
+Our direction is **Name the technique**: a classifier that finds manipulation techniques in news headlines and explains each verdict in plain language. Around it we build the game **no i am not brainwashed**, where players learn to see manipulation, and the correct answer, score and system confidence are shown at every step.
 
 > **Status.** The current state lives in [docs/STATUS.md](docs/STATUS.md). In short: infrastructure (stage 0) is ready, the VPS is configured, and a test hello-world runs over HTTPS. The application code is not written yet; agents from `.claude/agents/`, orchestrated by the repo-orchestrator skill, will build it.
 
@@ -37,7 +37,7 @@ Three related parts that share **one core** (the classifier):
 
 | Part | What it does | Audience |
 |---|---|---|
-| **Spot the Spin game** | a round of three headlines about one event: the player picks a technique, marks evidence words, sees the reference answer, score and system confidence, and can dispute the answer | players, jury demo |
+| **no i am not brainwashed game** | a round of three headlines about one event: the player picks a technique, marks evidence words, sees the reference answer, score and system confidence, and can dispute the answer | players, jury demo |
 | **Analyze** | paste text or a URL, get highlighted fragments, the technique and a plain-language explanation | any user, public API |
 | **/metrics** | precision, recall, F1 per technique, false-positive rate on "no technique", confusion matrix, confidence calibration, sample sizes and intervals | jury: proof of honesty |
 
