@@ -6,26 +6,35 @@
 //   track-record, track-record-body,
 //   step-examine, examine-outlet, technique-form, word-headline, words-hint, words-selected, words-clear,
 //   technique-options, submit-answer,
-//   step-answer, answer-stamp, answer-headline, answer-disputed, answer-reference, answer-confidence,
-//   answer-ref-words, answer-player, answer-explanation, answer-score, dispute-btn, next-headline,
+//   step-answer, answer-outcome, outcome-stamp, outcome-text, answer-headline, answer-disputed,
+//   answer-reference, answer-ref-words, answer-player, answer-explanation, answer-confidence,
+//   answer-score, dispute-btn, next-headline,
 //   step-dispute, dispute-form, dispute-options, dispute-comment, dispute-submit, dispute-cancel, dispute-result,
-//   step-summary, round-score, summary-list, new-round
+//   step-closed, closed-score, closed-recap, closed-next, closed-next-line, closed-countdown,
+//   closed-next-at, closed-late, closed-refresh
 //
 // Flow: board (three clippings) -> examine (technique tag + evidence words on one screen,
-// one "File the report" submit) -> reveal -> optional dispute -> next clipping -> summary.
+// one "File the report" submit) -> reveal (the player's outcome stamp first, then the reference
+// answer) -> optional dispute -> next clipping -> closed edition.
+// There is one challenge per day: GET /api/round answers { completed: true, ... } once the player
+// finished it, and the closed-edition sheet (score, recap, countdown to next_edition_at) is shown
+// instead of a board. No button starts another round.
 //
 // Endpoints: GET /api/round, POST /api/answer, POST /api/dispute, GET /api/metrics (track-record note).
-// Shapes: see assets/common.js.
+// Shapes: see assets/common.js. Mock: ?mock=1 (round.json), ?mock=1&mock_case=completed (round_completed.json).
 
 import {
-  TECHNIQUES, techniqueLabel, isMock, api, ApiError, loadMock, initPage, tokenize,
+  TECHNIQUES, techniqueLabel, isMock, mockCase, api, ApiError, loadMock, initPage, tokenize,
   findSpanRanges, renderLayers, confidence, proportion, pct, el, rollNumber, slideIn, reducedMotion,
 } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
 
-const STEPS = ["headlines", "examine", "answer", "dispute", "summary"];
+const STEPS = ["headlines", "examine", "answer", "dispute", "closed"];
 const ROTATIONS = [-2.2, 1.6, -1.1, 2.4, -1.8];
+// Evidence points (of 40) below which a correct technique counts as "loose evidence".
+const LOOSE_EVIDENCE_BELOW = 20;
+const MOCK_NEXT_EDITION_MS = (5 * 60 + 12) * 60 * 1000 + 30 * 1000; // demo countdown: 5h 12m
 
 const state = {
   round: null,
@@ -34,9 +43,13 @@ const state = {
   results: [], // per item: answer response
 };
 
+let countdownTimer = 0; // the one interval of the closed-edition countdown
+
 // ---------- Step handling ----------
 
 function showStep(step, moveFocus = true) {
+  if (step !== "closed") stopCountdown();
+  $("step-indicator").hidden = step === "closed";
   STEPS.forEach((s) => {
     const section = $(`step-${s}`);
     if (!section || s === "dispute") return; // the dispute panel opens below the answer
@@ -71,11 +84,21 @@ function showError(msg) {
 
 async function loadRound() {
   showError("");
+  stopCountdown();
   setStatus("Fetching today's clippings...");
   try {
-    const round = await api("GET", "/api/round");
+    const mockFile = isMock && mockCase === "completed" ? "round_completed.json" : undefined;
+    const round = await api("GET", "/api/round", undefined, mockFile);
     if (!round || !Array.isArray(round.items) || round.items.length === 0) {
       throw new Error("The round has no headlines.");
+    }
+    if (round.completed === true) {
+      // Today's challenge is done: show the closed edition, never another board.
+      setStatus("");
+      renderClosed(round);
+      showStep("closed", state.loadedOnce === true);
+      state.loadedOnce = true;
+      return;
     }
     state.round = round;
     state.idx = 0;
@@ -83,7 +106,7 @@ async function loadRound() {
     state.picks = round.items.map((item) => ({ technique: null, selected: new Set(), tokens: tokenize(item.text) }));
     renderHeadlines();
     setStatus("");
-    // Do not steal focus on the first page load; move it on "Open a new case".
+    // Do not steal focus on the first page load.
     showStep("headlines", state.loadedOnce === true);
     state.loadedOnce = true;
   } catch (err) {
@@ -297,12 +320,30 @@ async function submitAnswer() {
     renderAnswer(result);
     setStatus("");
     showStep("answer");
-    slamStamp($("answer-stamp"));
+    slamStamp($("outcome-stamp"));
   } catch (err) {
     setStatus("");
-    showError(`Could not check the answer: ${err.message}`);
+    if (err instanceof ApiError && err.status === 409) {
+      // A half-finished round was resumed: this clipping was filed on an earlier visit.
+      await skipFiledClipping();
+    } else {
+      showError(`Could not check the answer: ${err.message}`);
+    }
   } finally {
     $("submit-answer").disabled = false;
+  }
+}
+
+/** This clipping already has a filed report (answering twice is HTTP 409): move on. */
+async function skipFiledClipping() {
+  const notice = "You already filed a report on this clipping earlier, so it keeps that result. Moving on.";
+  if (state.idx < state.round.items.length - 1) {
+    state.idx += 1;
+    openExamine();
+    setStatus(notice);
+  } else {
+    await closeCase();
+    setStatus(notice);
   }
 }
 
@@ -315,11 +356,49 @@ function slamStamp(node) {
   ], { duration: 420, delay: 250, easing: "cubic-bezier(.3,.1,.6,1)", fill: "backwards" });
 }
 
+/**
+ * The player's own result for one clipping, shown before anything else on the reveal.
+ * It is about the player's call, never about the system's confidence:
+ *   technique matches the reference, evidence fine -> "Spot on"
+ *   technique matches, evidence points low          -> "Right call, loose evidence"
+ *   technique differs                               -> "Not this time"
+ */
+function outcomeFor(score, ref, pick) {
+  const yours = techniqueLabel(pick.technique);
+  if (score.technique_points < 60) {
+    return {
+      key: "miss",
+      stamp: "Not this time",
+      text: `You flagged ${yours}; the system found ${techniqueLabel(ref.technique)}.`,
+    };
+  }
+  if (score.evidence_points < LOOSE_EVIDENCE_BELOW) {
+    const detail = selectedWords(pick).length === 0
+      ? "but you marked no words as evidence."
+      : "but the words you marked overlap little with the system's evidence.";
+    return {
+      key: "loose",
+      stamp: "Right call, loose evidence",
+      text: `You flagged ${yours}, the same as the system, ${detail}`,
+    };
+  }
+  return {
+    key: "hit",
+    stamp: "Spot on",
+    text: `You flagged ${yours}, and the system found the same.`,
+  };
+}
+
 function renderAnswer(result) {
   const item = state.round.items[state.idx];
   const pick = state.picks[state.idx];
   const ref = result.reference;
   const conf = confidence(ref);
+
+  const outcome = outcomeFor(result.score, ref, pick);
+  $("answer-outcome").className = `outcome outcome-${outcome.key}`;
+  $("outcome-stamp").textContent = outcome.stamp;
+  $("outcome-text").textContent = outcome.text;
 
   const { ranges: refRanges, missing } = findSpanRanges(item.text, ref.evidence_spans);
   const pickRanges = [...pick.selected].map((i) => ({ start: pick.tokens[i].start, end: pick.tokens[i].end }));
@@ -327,10 +406,6 @@ function renderAnswer(result) {
     { ranges: refRanges, className: "hl-ref", tag: "mark", srLabel: "reference word" },
     { ranges: pickRanges, className: "hl-pick", srLabel: "your word" },
   ]);
-
-  const stamp = $("answer-stamp");
-  stamp.textContent = conf.stamp;
-  stamp.className = `stamp stamp-${conf.key}`;
 
   const disputedBox = $("answer-disputed");
   if (ref.disputed) {
@@ -345,9 +420,7 @@ function renderAnswer(result) {
   }
 
   $("answer-reference").textContent = techniqueLabel(ref.technique);
-  const confEl = $("answer-confidence");
-  confEl.textContent = conf.label;
-  confEl.className = `pill pill-${conf.key}`;
+  $("answer-confidence").textContent = confidenceCaption(conf);
 
   const refWords = (ref.evidence_spans || []).map((s) => (Array.isArray(s) ? item.text.slice(s[0], s[1]) : s));
   $("answer-ref-words").textContent = refWords.length ? refWords.map((w) => `"${w}"`).join(", ") : "none";
@@ -393,10 +466,14 @@ function nextHeadline() {
     state.idx += 1;
     openExamine();
   } else {
-    renderSummary();
-    showStep("summary");
-    slamStamp(document.querySelector(".stamp-closed"));
+    closeCase();
   }
+}
+
+/** Small, muted caption: how strongly the system agrees with itself (not a verdict on the player). */
+function confidenceCaption(conf) {
+  if (conf.key === "disputed") return "System confidence: none. Disputed — no confident verdict.";
+  return `System confidence: ${conf.key === "high" ? "high" : "moderate"}`;
 }
 
 // ---------- Dispute ----------
@@ -466,46 +543,147 @@ async function onDisputeSubmit(ev) {
   }
 }
 
-// ---------- Summary ----------
+// ---------- Closed edition ----------
 
-function renderSummary() {
+/** After the last answer: fetch the server's closed-edition data (or build it from the page). */
+async function closeCase() {
+  setStatus("Going to press...");
+  let data = null;
+  if (!isMock) {
+    try {
+      const res = await api("GET", "/api/round");
+      if (res && res.completed === true) data = res;
+    } catch (err) {
+      data = null; // fall back to the answers held in the page
+    }
+  }
+  setStatus("");
+  renderClosed(data || localClosed());
+  showStep("closed");
+  slamStamp(document.querySelector(".closed-sheet .stamp"));
+}
+
+/** The closed-edition data from the answers in this page (mock mode, or the server was unreachable). */
+function localClosed() {
   const results = state.results;
+  const items = state.round.items.map((item, i) => {
+    const r = results[i];
+    return {
+      item_id: item.item_id,
+      text: item.text,
+      outlet: item.outlet || "",
+      player_technique: state.picks[i].technique,
+      reference_technique: r ? r.reference.technique : null,
+      total: r ? r.score.total : null,
+    };
+  });
+  const totals = items.map((i) => i.total).filter(Number.isFinite);
   const last = results[results.length - 1];
   let roundScore = last && last.round && Number.isFinite(last.round.round_score) ? last.round.round_score : null;
-  let note = "";
-  if (roundScore === null) {
-    const totals = results.map((r) => r.score.total);
+  if (roundScore === null && totals.length) {
     roundScore = Math.floor(totals.reduce((a, b) => a + b, 0) / totals.length + 0.5);
-    note = " (computed in the browser; the server did not return a round score)";
   }
-  const scoreBox = $("round-score");
-  scoreBox.textContent = "";
-  const rolling = el("span", { class: "roll", text: "0" });
-  scoreBox.append(rolling, ` / 100${note}`);
-  rollNumber(rolling, roundScore, "", 1200);
+  return {
+    completed: true,
+    daily: true,
+    date: state.round.date,
+    next_edition_at: isMock ? new Date(Date.now() + MOCK_NEXT_EDITION_MS).toISOString() : null,
+    round_id: state.round.round_id,
+    round_score: roundScore,
+    items,
+  };
+}
 
-  const table = $("summary-list");
-  table.textContent = "";
-  table.append(el("caption", { text: "Your reports compared with the reference answers" }));
-  table.append(el("thead", {}, el("tr", {},
-    el("th", { scope: "col", text: "Headline" }),
-    el("th", { scope: "col", text: "Your technique" }),
-    el("th", { scope: "col", text: "Reference" }),
-    el("th", { scope: "col", text: "Confidence" }),
-    el("th", { scope: "col", class: "num", text: "Score" }))));
-  const tbody = el("tbody");
-  state.round.items.forEach((item, i) => {
-    const r = results[i];
-    const ref = r.reference;
-    const c = confidence(ref);
-    tbody.append(el("tr", {},
-      el("td", { text: item.text }),
-      el("td", { text: techniqueLabel(state.picks[i].technique) }),
-      el("td", { text: techniqueLabel(ref.technique) }),
-      el("td", {}, el("span", { class: `pill pill-${c.key}`, text: c.label })),
-      el("td", { class: "num", text: String(r.score.total) })));
+function renderClosed(data) {
+  const scoreBox = $("closed-score");
+  scoreBox.textContent = "";
+  if (Number.isFinite(data.round_score)) {
+    const rolling = el("span", { class: "roll", text: "0" });
+    scoreBox.append(rolling, " / 100");
+    rollNumber(rolling, data.round_score, "", 1200);
+  } else {
+    scoreBox.textContent = "n/a";
+  }
+
+  const list = $("closed-recap");
+  list.textContent = "";
+  data.items.forEach((item, i) => {
+    const filed = item.player_technique !== null && item.player_technique !== undefined;
+    const same = filed && item.player_technique === item.reference_technique;
+    list.append(el("li", { class: `recap-item ${same ? "recap-same" : "recap-miss"}` },
+      el("span", { class: "clip-no typewriter", text: `Exhibit ${String.fromCharCode(65 + i)}${item.outlet ? ` · ${item.outlet}` : ""}` }),
+      el("span", { class: "recap-headline", text: item.text }),
+      el("span", { class: "recap-calls" },
+        el("span", {}, "Your call: ", el("strong", { text: techniqueLabel(item.player_technique) })),
+        el("span", {}, "Reference call: ", el("strong", { text: techniqueLabel(item.reference_technique) }))),
+      el("span", { class: "recap-result" },
+        el("span", { class: "recap-tag", text: same ? "Same call" : "Different call" }),
+        el("span", { class: "recap-points", text: Number.isFinite(item.total) ? `${item.total} / 100` : "n/a" }))));
   });
-  table.append(tbody);
+
+  // Mock demo: the sample file's time is in the past, so show a live countdown anyway.
+  let nextMs = Date.parse(data.next_edition_at);
+  if (isMock && !(nextMs > Date.now())) nextMs = Date.now() + MOCK_NEXT_EDITION_MS;
+  const next = $("closed-next");
+  next.hidden = !Number.isFinite(nextMs);
+  $("closed-refresh").hidden = true;
+  $("closed-late").hidden = true;
+  $("closed-next-line").hidden = false;
+  if (Number.isFinite(nextMs)) {
+    $("closed-countdown").setAttribute("datetime", new Date(nextMs).toISOString());
+    $("closed-next-at").textContent = `On the stands ${dayWord(nextMs)} at ${new Date(nextMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}, your local time.`;
+    startCountdown(nextMs);
+  }
+}
+
+function dayWord(ms) {
+  const target = new Date(ms);
+  const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(target) - midnight(new Date())) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
+  return target.toLocaleDateString([], { weekday: "long" });
+}
+
+function formatLeft(ms) {
+  const secs = Math.floor(ms / 1000);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+  return `${s}s`;
+}
+
+/** One interval at a time, always cleared before a new one starts or the sheet is left. */
+function stopCountdown() {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = 0;
+  }
+}
+
+function startCountdown(nextMs) {
+  stopCountdown();
+  const node = $("closed-countdown");
+  const tick = () => {
+    const left = nextMs - Date.now();
+    if (left > 0) {
+      node.textContent = formatLeft(left);
+      return true;
+    }
+    stopCountdown();
+    $("closed-next-line").hidden = true;
+    $("closed-late").hidden = false;
+    $("closed-refresh").hidden = false;
+    return false;
+  };
+  if (tick()) countdownTimer = setInterval(tick, 1000);
+}
+
+async function onFetchNewEdition() {
+  await loadRound();
+  if (!$("step-closed").hidden) setStatus("The new edition is not out yet. Try again in a minute.");
 }
 
 // ---------- Mock-only scoring ----------
@@ -591,7 +769,8 @@ function init() {
   $("dispute-cancel").addEventListener("click", () => { closeDispute(); $("dispute-btn").focus(); });
   $("dispute-form").addEventListener("submit", onDisputeSubmit);
   $("next-headline").addEventListener("click", nextHeadline);
-  $("new-round").addEventListener("click", loadRound);
+  $("closed-refresh").addEventListener("click", onFetchNewEdition);
+  window.addEventListener("pagehide", stopCountdown);
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);

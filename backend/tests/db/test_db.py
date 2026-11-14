@@ -107,3 +107,46 @@ def test_second_answer_for_the_same_item_is_refused(tmp_db_path: Path) -> None:
     with pytest.raises(db.DuplicateAnswerError):
         db.insert_answer(tmp_db_path, **kwargs)
     assert db.answer_totals(tmp_db_path, kwargs["player_id"], result.round_id) == [0]
+
+
+def test_player_round_items_reveal_the_reference_only_for_answered_items(
+    tmp_db_path: Path,
+) -> None:
+    result = seed_worked_example(tmp_db_path)
+    items = db.get_round(tmp_db_path, result.round_id).items
+    me, other = "player-me-1234567890ab", "player-other-1234567890"
+
+    def answer(player: str, index: int, technique: str, total: int) -> None:
+        db.insert_answer(
+            tmp_db_path,
+            player_id=player,
+            round_id=result.round_id,
+            item_id=items[index].item_id,
+            technique=technique,
+            selected_words=[],
+            technique_points=0,
+            evidence_points=total,
+            total=total,
+        )
+
+    answer(me, 1, "doubt", 40)
+    answer(other, 0, "doubt", 7)  # another player's answers never show up for me
+
+    rows = db.player_round_items(tmp_db_path, me, result.round_id)
+
+    assert [r.item_id for r in rows] == [i.item_id for i in items]  # position order
+    assert [r.reference_technique for r in rows] == [
+        None,
+        items[1].reference.technique,
+        None,
+    ]
+    assert [(r.player_technique, r.total) for r in rows] == [
+        (None, None),
+        ("doubt", 40),
+        (None, None),
+    ]
+    assert db.recently_completed_round_ids(tmp_db_path, me) == []
+    answer(me, 0, "doubt", 0)
+    answer(me, 2, "doubt", 0)
+    assert db.recently_completed_round_ids(tmp_db_path, me) == [result.round_id]
+    assert db.recently_completed_round_ids(tmp_db_path, other) == []

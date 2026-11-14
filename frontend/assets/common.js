@@ -4,7 +4,8 @@
 // frontend/mock/*.json instead of the API. The mock files are the reference
 // response shapes the API must return:
 //
-//   GET  /api/round    -> mock/round.json
+//   GET  /api/round    -> mock/round.json (or mock/round_completed.json with &mock_case=completed:
+//                                            the closed-edition response once today's challenge is done)
 //   POST /api/answer   -> mock/answer.json  ("example_response" is the response shape;
 //                                            "by_item" holds per-item references for mock play)
 //   POST /api/dispute  -> mock/dispute.json

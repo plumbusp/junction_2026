@@ -35,8 +35,11 @@ def make_client(tmp_db_path: Path, metrics_path: Path):
             "analyze_limit": ANALYZE_LIMIT,
             "fetch_url": _no_network_fetch,
         }
+        settings_fields = overrides.pop("settings", {})  # e.g. daily_job_hour=6
         params.update(overrides)
-        app = create_app(Settings(core_mode="stub", db_path=tmp_db_path), **params)
+        app = create_app(
+            Settings(core_mode="stub", db_path=tmp_db_path, **settings_fields), **params
+        )
         client = TestClient(app)
         client.__enter__()
         clients.append(client)

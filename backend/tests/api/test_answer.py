@@ -91,5 +91,7 @@ def test_finished_round_is_not_served_again(client: TestClient, seeded) -> None:
 
     res = client.get("/api/round")
 
-    assert res.status_code == 409
-    assert res.json()["error"] == "all_rounds_played"
+    assert res.status_code == 200
+    body = res.json()
+    assert body["completed"] is True and body["round_id"] == round_id
+    assert "event" not in body  # the completed state, not a playable round

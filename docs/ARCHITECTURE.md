@@ -72,6 +72,14 @@ Round rule: a round is the 3 headlines of one event with the maximal number of d
 
 SQLite tables (`app/db.py`): `rounds` (with `n_outlets`, `diversity`, `techniques`), `round_items`, `answers`, `disputes`, `dispute_votes`, `daily_challenge` (one round per local date), `job_runs` (one row per local date; the idempotency guard of the daily job).
 
+## `GET /api/round` contract (one challenge per local day)
+
+- **Open round:** `{round_id, date, event, source_note, items:[{item_id,text,outlet}]}` plus `daily: true` for today's daily. No references or techniques are revealed. Partial progress continues the same round; answering an item twice is 409.
+- **Completed:** HTTP 200 `{completed: true, daily, date, next_edition_at (ISO-8601 with offset), round_id, round_score, items:[{item_id,text,outlet,player_technique,reference_technique,total}]}`. Returned once the player answered every item of today's daily; no other round is ever served afterwards. `reference_technique` only for items the player already answered. If there is no daily for today, the old fallback (newest unfinished round, `daily: false`) applies.
+- **503** `no_rounds` when nothing is available. The old 409 `all_rounds_played` is gone.
+- The next edition is the next `DAILY_JOB_HOUR:DAILY_JOB_MINUTE` in `DAILY_TZ`. Manual refresh: `python -m app.news.daily --rebuild-today` inside the container.
+- Known gap: after a reload mid-round the page restarts at clipping 1 and skips already-answered clippings via 409; an additive `answered_item_ids` field would fix it cleanly.
+
 ## Game rules attached to the contract
 
 - Tokenizer (`app.game.scoring.tokenize`, also used by eval for span token-F1 and by the game page for clickable words): lowercase, split on characters that are not letters or digits, except that a hyphen between two letters or digits stays inside the token ("rip-off" is one token). This keeps the PLAN worked example at 87.

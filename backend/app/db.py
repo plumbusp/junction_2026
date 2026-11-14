@@ -838,6 +838,65 @@ def completed_round_ids(db_path: Path | str, player_id: str) -> set[str]:
     return {row["round_id"] for row in rows}
 
 
+def recently_completed_round_ids(db_path: Path | str, player_id: str) -> list[str]:
+    """Rounds the player completed, the one they finished last first."""
+    with connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT a.round_id FROM answers a WHERE a.player_id = ? GROUP BY a.round_id"
+            " HAVING COUNT(*) >= (SELECT COUNT(*) FROM round_items i"
+            "  WHERE i.round_id = a.round_id AND i.position IS NOT NULL)"
+            " ORDER BY MAX(a.answer_id) DESC",
+            (player_id,),
+        ).fetchall()
+    return [row["round_id"] for row in rows]
+
+
+@dataclass(frozen=True)
+class PlayerItem:
+    """One in-play headline with the player's own answer, if any."""
+
+    item_id: str
+    text: str
+    outlet: str
+    player_technique: str | None  # None until the player answered this item
+    reference_technique: str | None  # revealed only for answered items
+    total: int | None
+
+
+def player_round_items(
+    db_path: Path | str, player_id: str, round_id: str
+) -> list[PlayerItem]:
+    """The round's in-play items in position order, with this player's answers.
+
+    The reference technique is returned only for items the player already answered (it
+    was shown to them with the answer); for the others it is None.
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT i.item_id, i.text, i.outlet, i.reference, a.technique AS player_technique,"
+            " a.total FROM round_items i LEFT JOIN answers a"
+            " ON a.item_id = i.item_id AND a.round_id = i.round_id AND a.player_id = ?"
+            " WHERE i.round_id = ? AND i.position IS NOT NULL ORDER BY i.position",
+            (player_id, round_id),
+        ).fetchall()
+    items: list[PlayerItem] = []
+    for row in rows:
+        answered = row["player_technique"] is not None
+        items.append(
+            PlayerItem(
+                item_id=row["item_id"],
+                text=row["text"],
+                outlet=row["outlet"],
+                player_technique=row["player_technique"],
+                reference_technique=(
+                    json.loads(row["reference"])["technique"] if answered else None
+                ),
+                total=int(row["total"]) if answered else None,
+            )
+        )
+    return items
+
+
 # ---------- Disputes ----------
 
 

@@ -1,0 +1,35 @@
+{
+  "_mock_note": "GET /api/round once the player has completed today's challenge (?mock=1&mock_case=completed). This is the exact response shape. next_edition_at is an ISO-8601 time with a zone offset; in mock mode the page replaces a time in the past with 'now + 5h 12m' so the countdown can be seen. The reference technique is present only for items the player already answered. The items are invented demo headlines.",
+  "completed": true,
+  "daily": true,
+  "date": "2026-11-14",
+  "next_edition_at": "2026-11-15T00:00:00+02:00",
+  "round_id": "mock-r1",
+  "round_score": 71,
+  "items": [
+    {
+      "item_id": "mock-r1-h1",
+      "text": "Council slams commuters with fare rip-off as prices jump 20%",
+      "outlet": "Mock outlet A",
+      "player_technique": "loaded_language",
+      "reference_technique": "loaded_language",
+      "total": 87
+    },
+    {
+      "item_id": "mock-r1-h2",
+      "text": "Fare hike will drown the city in gridlock, critics warn",
+      "outlet": "Mock outlet B",
+      "player_technique": "doubt",
+      "reference_technique": "appeal_to_fear",
+      "total": 27
+    },
+    {
+      "item_id": "mock-r1-h3",
+      "text": "City council approves 20% increase in bus and tram fares from January",
+      "outlet": "Mock outlet C",
+      "player_technique": "no_technique",
+      "reference_technique": "no_technique",
+      "total": 100
+    }
+  ]
+}

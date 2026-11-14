@@ -99,10 +99,14 @@
 
     <!-- Step 3: answer reveal -->
     <section id="step-answer" aria-labelledby="h-answer" hidden>
-      <h2 id="h-answer" class="board-heading">Clipping <span class="js-item-no"></span> of 3: the system's call</h2>
+      <h2 id="h-answer" class="board-heading">Clipping <span class="js-item-no"></span> of 3: the result</h2>
+      <!-- The player's own result comes first: a stamp about YOUR call, not the system's confidence. -->
+      <div id="answer-outcome" class="outcome">
+        <p id="outcome-stamp" class="outcome-stamp"></p>
+        <p id="outcome-text" class="outcome-text"></p>
+      </div>
       <div class="reveal-layout">
         <div class="clipping paper reveal-clip">
-          <div id="answer-stamp" class="stamp" aria-hidden="true"></div>
           <ul class="legend" aria-label="Highlight legend">
             <li><span class="swatch swatch-ref" aria-hidden="true"></span>Reference words</li>
             <li><span class="swatch swatch-pick" aria-hidden="true"></span>Your words</li>
@@ -112,12 +116,12 @@
           <div class="verdict-head">
             <span class="typewriter">Reference answer:</span>
             <span id="answer-reference" class="verdict-technique"></span>
-            <span id="answer-confidence" class="pill"></span>
           </div>
-          <p class="small muted-ink">The reference answer is the system's call, not the truth. It can be wrong; confidence says how strongly the system agrees with itself, not a probability. <a href="metrics/" data-internal>How it is measured</a>.</p>
           <p class="small">Reference words: <span id="answer-ref-words"></span></p>
           <p class="small">Your report: <span id="answer-player"></span></p>
           <p id="answer-explanation" class="explanation"></p>
+          <p id="answer-confidence" class="conf-note"></p>
+          <p class="small muted-ink">The reference answer is the system's call and it can be wrong. Confidence says how strongly the system agrees with itself, not a probability. <a href="metrics/" data-internal>How it is measured</a>.</p>
         </div>
         <div class="paper ledger">
           <h3>Your score for this clipping</h3>
@@ -152,18 +156,33 @@
       <div id="dispute-result" role="status" aria-live="polite"></div>
     </section>
 
-    <!-- Round summary -->
-    <section id="step-summary" aria-labelledby="h-summary" hidden>
-      <div class="paper sheet summary-sheet">
+    <!-- Closed edition: shown right after the last clipping and whenever the player returns
+         to a challenge they already completed. There is no way to start another round. -->
+    <section id="step-closed" aria-labelledby="h-closed" hidden>
+      <div class="paper sheet closed-sheet">
         <div class="stamp stamp-closed" aria-hidden="true">Case closed</div>
-        <h2 id="h-summary">Case closed: round complete</h2>
-        <p>Round score (mean of the three clippings):</p>
-        <p id="round-score" class="big-score"></p>
-        <div class="table-wrap">
-          <table class="data" id="summary-list"></table>
+        <p class="closed-kicker typewriter small-caps">Stop press &middot; Late final</p>
+        <h2 id="h-closed">Today's edition is closed.</h2>
+        <p class="closed-deck">You completed today's challenge.</p>
+        <p class="closed-lede">Three clippings filed, three calls made, and the desk has had its say. The presses are cooling, the ink is drying and the night editor has gone for a coffee.</p>
+
+        <div class="closed-score">
+          <p class="typewriter small-caps closed-score-label">Your final score</p>
+          <p id="closed-score" class="big-score"></p>
+          <p class="small muted-ink">Mean of the three clippings. Each is worth up to 100.</p>
         </div>
+
+        <h3 class="closed-sub">The three clippings, as filed</h3>
+        <ol id="closed-recap" class="closed-recap"></ol>
+
+        <div id="closed-next" class="closed-next" hidden>
+          <p id="closed-next-line" class="closed-next-line"><span class="typewriter">Next edition in</span> <time id="closed-countdown" class="countdown" role="timer"></time></p>
+          <p id="closed-next-at" class="small muted-ink"></p>
+          <p id="closed-late" class="small" hidden>The new edition should be on the stands by now.</p>
+          <button type="button" id="closed-refresh" class="btn" hidden>Fetch the new edition</button>
+        </div>
+        <p class="closed-sign-off">Fresh press tomorrow. Bring a sharper pencil.</p>
         <div class="btn-row">
-          <button type="button" id="new-round" class="btn">Open a new case</button>
           <a class="btn btn-secondary" href="metrics/" data-internal>How accurate is the system?</a>
         </div>
       </div>
