@@ -101,7 +101,10 @@ With `DAILY_JOB_ENABLED=true` the app starts an in-process scheduler (single uvi
 ```
 docker exec spotthespin-app-1 python -m app.news.daily            # respects "already done today"
 docker exec spotthespin-app-1 python -m app.news.daily --force    # re-run for today (reuses cached verdicts)
+docker exec spotthespin-app-1 python -m app.news.daily --rebuild-today   # rebuild today's unanswered rounds and re-pick the daily
 ```
+
+`--rebuild-today` calls the paid models for headlines that are not in the cache. Rounds that already have answers or disputes are kept. If `DAILY_MAX_CLUSTERS`, `DAILY_MAX_PER_CLUSTER` or `DAILY_MAX_HEADLINES` are pinned in the server `.env`, they override the defaults (8 / 6 / 48).
 
 The paid verdict cache lives in the volume (`/app/var/cache`, linked from `/app/data/cache`), so redeploys do not re-pay for labelled headlines. Check the run: `docker exec spotthespin-app-1 python -c "import sqlite3;print(sqlite3.connect('/app/var/app.db').execute('select * from job_runs order by 1 desc limit 3').fetchall())"` (counts only, no headline text).
 
