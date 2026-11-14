@@ -104,7 +104,9 @@ SOURCE_NOTES["ptc_headlines"] = [
     ),
     (
         "PTC headlines: no_technique means the annotators marked no propaganda span in the "
-        "title, not a separate neutrality judgement."
+        "title, not a separate neutrality judgement. Titles were annotated inside the whole "
+        "article and some clearly loaded titles carry no span, so part of the false "
+        "positives here may be label noise."
     ),
 ]
 
