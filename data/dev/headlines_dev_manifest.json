@@ -1,18 +1,19 @@
 {
   "source": "headlines_llm",
   "file": "headlines_dev.jsonl",
-  "n": 92,
+  "n": 81,
   "counts_per_technique": {
+    "no_technique": 35,
     "loaded_language": 28,
-    "appeal_to_fear": 7,
     "exaggeration_minimization": 3,
-    "doubt": 5,
     "vague_authority": 3,
-    "changing_subject": 1,
-    "no_technique": 45
+    "appeal_to_fear": 6,
+    "doubt": 5,
+    "changing_subject": 1
   },
   "date": "2026-11-15",
   "annotator": "ONE LLM annotator. NOT human annotation; no second annotator; no kappa.",
-  "protocol": "Real RSS headline titles from 35 outlets, fetched 2026-11-15; labels decided from the text alone; picked by the annotator from a random pool, so not a random sample. DEV ONLY: used for retrieval few-shot and tuning; never mixed into data/eval. Stories already in eval_v2 were excluded.",
-  "sha256": "2d5158576d02f648aadd0e3f6873f887a0485eb5d0c91f2fe0204e00753df5e0"
+  "protocol": "Real RSS headline titles from 35 outlets, fetched 2026-11-15; labels decided from the text alone; picked by the annotator from a random pool, so not a random sample. DEV ONLY: used for retrieval few-shot and tuning; never mixed into data/eval.",
+  "overlap_check": "A content-word overlap check against data/eval/eval_v2 headlines found 11 same-story dev headlines (same event, different outlet); they were REMOVED from dev, and the one prompt anchor from such a story was replaced. Remaining pairs below a word-overlap threshold of 0.2 (Jaccard) and fewer than 3 shared content words were not found by the check.",
+  "sha256": "b4570dd18673da582044660183e0abdd950d26b5803573cf479cce3a9a2a427b"
 }
