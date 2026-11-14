@@ -61,6 +61,12 @@ Rules attached to the contract:
 - Results are cached by hash of normalized text + prompt version.
 - Until the real core exists, `core/stub.py` returns deterministic fake verdicts with the same types, so consumers can be built in parallel.
 
+## Game rules attached to the contract
+
+- Tokenizer (`app.game.scoring.tokenize`, also used by eval for span token-F1 and by the game page for clickable words): lowercase, split on characters that are not letters or digits, except that a hyphen between two letters or digits stays inside the token ("rip-off" is one token). This keeps the PLAN worked example at 87.
+- Headlines whose reference `Verdict.disputed` is True are not used in rounds; the API filters them out of the pool before `build_round`.
+- Disputes enter review after N distinct voters (default 3) or by explicit team escalation (`escalate_by_team`). Rescored items go to dev only.
+
 ## Data formats
 
 `data/dev/*.jsonl` and `data/eval/<version>/*.jsonl`, one example per line:
