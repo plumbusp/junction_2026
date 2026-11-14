@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gold Set Labelling</title>
+  <meta name="description" content="Offline helper for labelling headlines: choose a technique, mark evidence words, download JSONL.">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <div id="mock-banner" class="mock-banner" role="note" hidden>
+    Mock mode: sample candidates from frontend/mock/label_candidates.json (invented demo headlines, never for evaluation).
+  </div>
+  <header class="site-header">
+    <div class="inner">
+      <span class="brand">Spot the Spin: labelling helper</span>
+    </div>
+  </header>
+
+  <main id="label">
+    <h1>Label headlines for the gold set</h1>
+    <p class="lead">Works fully offline: nothing is sent anywhere. Label on your own, before seeing any model output or the other annotator's labels. Any labels already present in the input file are ignored and not shown.</p>
+
+    <section class="card" aria-labelledby="h-setup">
+      <h2 id="h-setup" style="margin-top:0">1. Set up</h2>
+      <div class="field">
+        <label for="label-annotator">Annotator ID <span class="hint">(for example "A" or "B"; required, used to compute agreement)</span></label>
+        <input type="text" id="label-annotator" autocomplete="off" maxlength="40">
+      </div>
+      <div class="field">
+        <label for="label-file">Candidates file <span class="hint">(.json array, {"items": [...]}, or .jsonl; each item needs "text", optional "id" and "source")</span></label>
+        <input type="file" id="label-file" accept=".json,.jsonl,application/json,text/plain">
+      </div>
+      <p id="label-status" class="status" role="status" aria-live="polite"></p>
+      <div id="label-error" class="error" role="alert" hidden></div>
+    </section>
+
+    <div id="label-empty" class="empty-state">No candidates loaded yet. Choose a file above.</div>
+
+    <section id="label-workspace" aria-labelledby="h-item" hidden>
+      <h2 id="h-item">2. Label item <span id="label-position"></span></h2>
+      <p class="progress small">Labelled: <span id="label-progress">0 of 0</span> · Item ID: <code id="label-item-id"></code> · Source: <span id="label-item-source"></span></p>
+
+      <form id="label-form">
+        <fieldset>
+          <legend>Technique</legend>
+          <ul id="label-technique-options" class="choice-list"></ul>
+        </fieldset>
+        <div class="field">
+          <span class="label" id="label-words-label">Evidence words</span>
+          <p class="hint" id="label-words-hint">Click or press Enter/Space on each word that shows the technique. Adjacent marked words are saved as one span, an exact substring of the text.</p>
+          <div id="label-text" class="headline-current tokens" role="group" aria-labelledby="label-words-label"></div>
+          <p class="small">Spans: <span id="label-spans">none</span></p>
+        </div>
+        <div class="field">
+          <label for="label-notes">Notes <span class="hint">(optional: doubts, a second plausible technique)</span></label>
+          <textarea id="label-notes" rows="2" maxlength="500"></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="label-prev" class="btn btn-secondary">Previous</button>
+          <button type="button" id="label-clear" class="btn btn-secondary">Clear this item</button>
+          <button type="submit" id="label-next" class="btn">Save and next</button>
+        </div>
+        <p class="kbd-hint">Saved labels are kept in this browser until you download them.</p>
+      </form>
+
+      <section aria-labelledby="h-download">
+        <h2 id="h-download">3. Download</h2>
+        <p class="small">Downloads one JSON object per line for every labelled item: id, source, text, technique, evidence_spans, annotator, labelled_at, notes. Unlabelled items are left out.</p>
+        <div class="btn-row">
+          <button type="button" id="label-download" class="btn">Download labelled JSONL</button>
+          <button type="button" id="label-reset" class="btn btn-secondary">Forget saved progress</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Real headlines only: synthetic (AI-written) headlines must never be labelled into the evaluation set.</p>
+  </footer>
+  <script src="../assets/label.js"></script>
+</body>
+</html>

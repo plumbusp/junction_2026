@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Analyze a Text</title>
+  <meta name="description" content="Paste a text or a URL and see which manipulation technique three AI models find, with highlighted evidence.">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <div id="mock-banner" class="mock-banner" role="note" hidden>
+    Mock mode: the result is a canned response from frontend/mock/, not a live analysis.
+  </div>
+  <header class="site-header">
+    <div class="inner">
+      <a class="brand" href="../" data-internal>Spot the Spin</a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li><a href="../" data-internal>Game</a></li>
+          <li><a href="./" data-internal aria-current="page">Analyze</a></li>
+          <li><a href="../metrics/" data-internal>Metrics</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="analyze">
+    <h1>Analyze a text</h1>
+    <p class="lead">Paste a headline or a short text, or give a news article URL. Three different AI models classify it with the same classifier the game uses; you see the technique, the evidence and how many models agree.</p>
+
+    <form id="analyze-form" class="card" novalidate>
+      <fieldset>
+        <legend>What do you want to analyze?</legend>
+        <div class="inline-choices">
+          <label for="mode-text"><input type="radio" name="input-mode" id="mode-text" value="text" checked> Text</label>
+          <label for="mode-url"><input type="radio" name="input-mode" id="mode-url" value="url"> URL</label>
+        </div>
+      </fieldset>
+      <div class="field" id="field-text">
+        <label for="analyze-text">Text <span class="hint">(up to 5000 characters)</span></label>
+        <textarea id="analyze-text" name="text" maxlength="5000" aria-describedby="text-count"></textarea>
+        <div id="text-count" class="hint">0 / 5000</div>
+      </div>
+      <div class="field" id="field-url" hidden>
+        <label for="analyze-url">Article URL <span class="hint">(https only; the headline and lead are extracted)</span></label>
+        <input type="url" id="analyze-url" name="url" placeholder="https://example.com/news/story" inputmode="url" autocomplete="off">
+      </div>
+      <div class="btn-row">
+        <button type="submit" id="analyze-submit" class="btn">Analyze</button>
+      </div>
+      <p id="analyze-status" class="status" role="status" aria-live="polite"></p>
+      <div id="analyze-error" class="error" role="alert" hidden></div>
+    </form>
+
+    <section id="analyze-result" aria-labelledby="h-result" hidden>
+      <h2 id="h-result">Result</h2>
+      <p id="result-mock-note" class="banner banner-info" hidden></p>
+      <div id="result-disputed" class="disputed-box" hidden></div>
+      <div class="card">
+        <div class="verdict-head">
+          <span id="result-technique-label">Majority answer:</span>
+          <span id="result-technique" class="verdict-technique"></span>
+          <span id="result-confidence" class="pill"></span>
+        </div>
+        <p class="small muted">System confidence is the number of models that agree, not a probability. The answer can be wrong; see <a href="../metrics/" data-internal>measured accuracy</a>.</p>
+        <p id="result-explanation"></p>
+      </div>
+
+      <h3>Evidence in the text</h3>
+      <ul class="legend" aria-label="Highlight legend">
+        <li><span class="swatch swatch-ref" aria-hidden="true"></span>Evidence chosen by at least two models</li>
+      </ul>
+      <p id="result-source" class="small muted" hidden></p>
+      <div id="result-text" class="analyzed-text"></div>
+      <p class="small">Evidence spans: <span id="result-spans"></span></p>
+
+      <h3>How each model voted</h3>
+      <div id="result-votes"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Texts you submit are sent to the classifier. Do not paste personal or confidential information.</p>
+  </footer>
+  <script type="module" src="../assets/analyze.js"></script>
+</body>
+</html>

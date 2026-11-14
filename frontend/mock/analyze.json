@@ -1,0 +1,16 @@
+{
+  "text": "Critics warn the reckless new tax will destroy small businesses overnight. The ministry says the change affects about 4% of firms and takes effect in March.",
+  "source_url": null,
+  "title": null,
+  "technique": "appeal_to_fear",
+  "evidence_spans": ["will destroy small businesses overnight", "reckless"],
+  "explanation": "The first sentence predicts a sudden catastrophe for small businesses without evidence, to make readers afraid of the tax. The second sentence is a neutral statement of facts.",
+  "agreement": 2,
+  "n_models": 3,
+  "disputed": false,
+  "votes": [
+    {"model": "claude", "technique": "appeal_to_fear", "evidence_spans": ["will destroy small businesses overnight", "reckless"], "explanation": "Threatens a catastrophic outcome."},
+    {"model": "gpt", "technique": "appeal_to_fear", "evidence_spans": ["will destroy small businesses overnight", "reckless"], "explanation": "Fear of business closures."},
+    {"model": "deepseek", "technique": "loaded_language", "evidence_spans": ["reckless"], "explanation": "Charged label for the tax."}
+  ]
+}

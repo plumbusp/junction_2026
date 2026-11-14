@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spot the Spin</title>
+  <meta name="description" content="A daily game: spot manipulation techniques in news headlines.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div id="mock-banner" class="mock-banner" role="note" hidden>
+    Mock mode: data comes from frontend/mock/*.json with invented demo headlines, not from the live system.
+  </div>
+  <header class="site-header">
+    <div class="inner">
+      <a class="brand" href="./" data-internal>Spot the Spin</a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li><a href="./" data-internal aria-current="page">Game</a></li>
+          <li><a href="analyze/" data-internal>Analyze</a></li>
+          <li><a href="metrics/" data-internal>Metrics</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="game">
+    <h1>Spot the Spin</h1>
+    <p class="lead">Three headlines about one event. For each one, name the manipulation technique (or "no technique"), mark the words that show it, then compare with the reference answer.</p>
+
+    <ol id="step-indicator" class="steps" aria-label="Round progress">
+      <li data-step="headlines">1. Headlines</li>
+      <li data-step="technique">2. Technique</li>
+      <li data-step="words">3. Evidence words</li>
+      <li data-step="answer">4. Answer</li>
+      <li data-step="dispute">5. Dispute</li>
+    </ol>
+
+    <p id="game-status" class="status" role="status" aria-live="polite"></p>
+    <div id="game-error" class="error" role="alert" hidden></div>
+
+    <!-- Step 1: headlines -->
+    <section id="step-headlines" aria-labelledby="h-headlines" hidden>
+      <h2 id="h-headlines">Today's event: <span id="round-event"></span></h2>
+      <p id="round-note" class="muted small"></p>
+      <ol id="headline-list" class="headline-list"></ol>
+      <div class="btn-row">
+        <button type="button" id="start-btn" class="btn">Start with headline 1</button>
+      </div>
+    </section>
+
+    <!-- Step 2: technique -->
+    <section id="step-technique" aria-labelledby="h-technique" hidden>
+      <h2 id="h-technique">Headline <span class="js-item-no"></span> of 3: which technique?</h2>
+      <p id="technique-headline" class="headline-current"></p>
+      <form id="technique-form">
+        <fieldset>
+          <legend>Pick one technique, or "No technique"</legend>
+          <ul id="technique-options" class="choice-list"></ul>
+        </fieldset>
+        <div class="btn-row">
+          <button type="submit" id="technique-next" class="btn">Next: mark the words</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Step 3: words -->
+    <section id="step-words" aria-labelledby="h-words" hidden>
+      <h2 id="h-words">Headline <span class="js-item-no"></span> of 3: mark the evidence words</h2>
+      <p id="words-hint" class="hint">Click or press Enter/Space on each word that shows the technique. Press again to unmark it.</p>
+      <div id="word-headline" class="headline-current tokens" role="group" aria-label="Words of the headline, toggle to mark as evidence"></div>
+      <p class="small">Your words: <span id="words-selected">none</span></p>
+      <div class="btn-row">
+        <button type="button" id="words-back" class="btn btn-secondary">Back to technique</button>
+        <button type="button" id="words-clear" class="btn btn-secondary">Clear words</button>
+        <button type="button" id="submit-answer" class="btn">Check my answer</button>
+      </div>
+    </section>
+
+    <!-- Step 4: answer -->
+    <section id="step-answer" aria-labelledby="h-answer" hidden>
+      <h2 id="h-answer">Headline <span class="js-item-no"></span> of 3: reference answer</h2>
+      <ul class="legend" aria-label="Highlight legend">
+        <li><span class="swatch swatch-ref" aria-hidden="true"></span>Reference words</li>
+        <li><span class="swatch swatch-pick" aria-hidden="true"></span>Your words</li>
+      </ul>
+      <p id="answer-headline" class="headline-current"></p>
+      <div id="answer-disputed" class="disputed-box" hidden></div>
+      <div class="card">
+        <div class="verdict-head">
+          <span>Reference answer:</span>
+          <span id="answer-reference" class="verdict-technique"></span>
+          <span id="answer-confidence" class="pill"></span>
+        </div>
+        <p class="small muted">The reference answer is the majority vote of three different AI models. It can be wrong; system confidence is the share of models that agree, not a probability.</p>
+        <p class="small">Reference words: <span id="answer-ref-words"></span></p>
+        <p class="small">Your answer: <span id="answer-player"></span></p>
+        <p id="answer-explanation"></p>
+      </div>
+      <div class="card">
+        <h3>Your score for this headline</h3>
+        <table class="score-table" id="answer-score"></table>
+      </div>
+      <details>
+        <summary>How each model voted</summary>
+        <div id="answer-votes"></div>
+      </details>
+      <div class="btn-row">
+        <button type="button" id="dispute-btn" class="btn btn-secondary" aria-expanded="false" aria-controls="step-dispute">I disagree: dispute this answer</button>
+        <button type="button" id="next-headline" class="btn">Next headline</button>
+      </div>
+    </section>
+
+    <!-- Step 5: dispute (opens below the answer) -->
+    <section id="step-dispute" class="card" aria-labelledby="h-dispute" hidden>
+      <h2 id="h-dispute">Dispute the reference answer</h2>
+      <p class="small">Pick the answer you think is right. One dispute does not change anything by itself: a headline is reviewed only after several players disagree. Confirmed disputes become training data for tuning (the dev set), never part of the test set used for /metrics.</p>
+      <form id="dispute-form">
+        <fieldset>
+          <legend>Your answer</legend>
+          <ul id="dispute-options" class="choice-list"></ul>
+        </fieldset>
+        <div class="field">
+          <label for="dispute-comment">Why? <span class="hint">(optional, max 500 characters)</span></label>
+          <textarea id="dispute-comment" maxlength="500" rows="3"></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="submit" id="dispute-submit" class="btn">Send dispute</button>
+          <button type="button" id="dispute-cancel" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+      <div id="dispute-result" role="status" aria-live="polite"></div>
+    </section>
+
+    <!-- Round summary -->
+    <section id="step-summary" aria-labelledby="h-summary" hidden>
+      <h2 id="h-summary">Round complete</h2>
+      <p>Round score (mean of the three headlines):</p>
+      <p id="round-score" class="big-score"></p>
+      <div class="table-wrap">
+        <table class="data" id="summary-list"></table>
+      </div>
+      <div class="btn-row">
+        <button type="button" id="new-round" class="btn">Play another round</button>
+        <a class="btn btn-secondary" href="metrics/" data-internal>How accurate is the system?</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Reference answers come from an ensemble of three AI models and can be wrong. See <a href="metrics/" data-internal>Metrics</a> for measured accuracy and false-positive rate.</p>
+  </footer>
+  <script type="module" src="assets/game.js"></script>
+</body>
+</html>

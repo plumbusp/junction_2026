@@ -1,0 +1,23 @@
+{
+  "round_id": "mock-r1",
+  "date": "2026-11-14",
+  "event": "City council raises public transport fares",
+  "source_note": "Mock round: invented demo headlines, not real news.",
+  "items": [
+    {
+      "item_id": "mock-r1-h1",
+      "text": "Council slams commuters with fare rip-off as prices jump 20%",
+      "outlet": "Mock outlet A"
+    },
+    {
+      "item_id": "mock-r1-h2",
+      "text": "Fare hike will drown the city in gridlock, critics warn",
+      "outlet": "Mock outlet B"
+    },
+    {
+      "item_id": "mock-r1-h3",
+      "text": "City council approves 20% increase in bus and tram fares from January",
+      "outlet": "Mock outlet C"
+    }
+  ]
+}

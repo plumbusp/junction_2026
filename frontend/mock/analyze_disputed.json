@@ -1,0 +1,16 @@
+{
+  "text": "Some say the new stadium deal raises questions that officials have yet to answer.",
+  "source_url": null,
+  "title": null,
+  "technique": "no_technique",
+  "evidence_spans": [],
+  "explanation": "The models did not agree. One saw doubt being raised without evidence, one saw an appeal to unnamed sources, and one saw an ordinary report.",
+  "agreement": 1,
+  "n_models": 3,
+  "disputed": true,
+  "votes": [
+    {"model": "claude", "technique": "doubt", "evidence_spans": ["raises questions"], "explanation": "Hints at wrongdoing without evidence."},
+    {"model": "gpt", "technique": "vague_authority", "evidence_spans": ["Some say"], "explanation": "Unnamed sources."},
+    {"model": "deepseek", "technique": "no_technique", "evidence_spans": [], "explanation": "Reports open questions neutrally."}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "_mock_note": "Invented demo headlines for trying the labelling helper. Never label these into data/eval/.",
+  "items": [
+    {"id": "mock-c1", "source": "gold", "text": "Council slams commuters with fare rip-off as prices jump 20%"},
+    {"id": "mock-c2", "source": "gold", "text": "Fare hike will drown the city in gridlock, critics warn"},
+    {"id": "mock-c3", "source": "gold", "text": "City council approves 20% increase in bus and tram fares from January"},
+    {"id": "mock-c4", "source": "gold", "text": "Experts say the new stadium deal doesn't add up"},
+    {"id": "mock-c5", "source": "gold", "text": "Minister dismisses flood damage as a few wet basements"}
+  ]
+}

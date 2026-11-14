@@ -1,0 +1,85 @@
+{
+  "_mock_note": "POST /api/answer. 'example_request' is the body the game page sends; 'example_response' is the exact response shape the API must return. 'by_item' holds the reference verdict per item_id, used only by ?mock=1 to score locally.",
+  "example_request": {
+    "round_id": "mock-r1",
+    "item_id": "mock-r1-h1",
+    "technique": "loaded_language",
+    "selected_words": ["slams"]
+  },
+  "example_response": {
+    "round_id": "mock-r1",
+    "item_id": "mock-r1-h1",
+    "player": {
+      "technique": "loaded_language",
+      "selected_words": ["slams"]
+    },
+    "reference": {
+      "technique": "loaded_language",
+      "evidence_spans": ["slams", "rip-off"],
+      "explanation": "The headline uses charged words such as \"slams\" and \"rip-off\" to make readers angry rather than state the fare change neutrally.",
+      "agreement": 3,
+      "n_models": 3,
+      "disputed": false,
+      "votes": [
+        {"model": "claude", "technique": "loaded_language", "evidence_spans": ["slams", "rip-off"], "explanation": "Charged verbs and labels."},
+        {"model": "gpt", "technique": "loaded_language", "evidence_spans": ["slams", "rip-off"], "explanation": "Emotionally loaded wording."},
+        {"model": "deepseek", "technique": "loaded_language", "evidence_spans": ["rip-off"], "explanation": "Labels the fare as a rip-off."}
+      ]
+    },
+    "score": {
+      "technique_points": 60,
+      "evidence_points": 27,
+      "total": 87,
+      "token_f1": 0.6667,
+      "precision": 1.0,
+      "recall": 0.5,
+      "no_technique_bonus": false
+    },
+    "round": {
+      "answered": 1,
+      "total_items": 3,
+      "round_score": null
+    }
+  },
+  "by_item": {
+    "mock-r1-h1": {
+      "technique": "loaded_language",
+      "evidence_spans": ["slams", "rip-off"],
+      "explanation": "The headline uses charged words such as \"slams\" and \"rip-off\" to make readers angry rather than state the fare change neutrally.",
+      "agreement": 3,
+      "n_models": 3,
+      "disputed": false,
+      "votes": [
+        {"model": "claude", "technique": "loaded_language", "evidence_spans": ["slams", "rip-off"], "explanation": "Charged verbs and labels."},
+        {"model": "gpt", "technique": "loaded_language", "evidence_spans": ["slams", "rip-off"], "explanation": "Emotionally loaded wording."},
+        {"model": "deepseek", "technique": "loaded_language", "evidence_spans": ["rip-off"], "explanation": "Labels the fare as a rip-off."}
+      ]
+    },
+    "mock-r1-h2": {
+      "technique": "appeal_to_fear",
+      "evidence_spans": ["drown", "gridlock"],
+      "explanation": "The headline predicts a frightening outcome (the city \"drowning\" in gridlock) without evidence, to make readers fear the change.",
+      "agreement": 2,
+      "n_models": 3,
+      "disputed": false,
+      "votes": [
+        {"model": "claude", "technique": "appeal_to_fear", "evidence_spans": ["drown", "gridlock"], "explanation": "Threat of a bad outcome."},
+        {"model": "gpt", "technique": "appeal_to_fear", "evidence_spans": ["drown", "gridlock"], "explanation": "Fear of traffic chaos."},
+        {"model": "deepseek", "technique": "exaggeration_minimization", "evidence_spans": ["drown the city"], "explanation": "Overstates the likely effect."}
+      ]
+    },
+    "mock-r1-h3": {
+      "technique": "no_technique",
+      "evidence_spans": [],
+      "explanation": "The headline states what was decided, by whom, by how much and from when, without charged wording.",
+      "agreement": 3,
+      "n_models": 3,
+      "disputed": false,
+      "votes": [
+        {"model": "claude", "technique": "no_technique", "evidence_spans": [], "explanation": "Neutral factual report."},
+        {"model": "gpt", "technique": "no_technique", "evidence_spans": [], "explanation": "No manipulation found."},
+        {"model": "deepseek", "technique": "no_technique", "evidence_spans": [], "explanation": "Plain statement of facts."}
+      ]
+    }
+  }
+}

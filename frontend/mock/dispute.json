@@ -1,0 +1,10 @@
+{
+  "dispute_id": "mock-d1",
+  "round_id": "mock-r1",
+  "item_id": "mock-r1-h2",
+  "status": "queued",
+  "disputes_on_item": 1,
+  "review_threshold": 3,
+  "target_set": "dev",
+  "message": "Dispute queued. The reference answer does not change until the headline is reviewed. Confirmed disputes are added to the dev set only, never to the test set."
+}
