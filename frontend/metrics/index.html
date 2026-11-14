@@ -4,68 +4,94 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Detection Metrics</title>
-  <meta name="description" content="Measured precision, recall, false-positive rate and agreement calibration of the Spot the Spin classifier, per source, with sample sizes and Wilson intervals.">
+  <meta name="description" content="Measured precision, recall, false-positive rate and confidence calibration of the Spot the Spin classifier, per source, with sample sizes and Wilson intervals.">
   <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="page-metrics">
   <div id="mock-banner" class="mock-banner" role="note" hidden>
     Mock mode: the numbers come from frontend/mock/metrics.json and are invented.
   </div>
-  <header class="site-header">
-    <div class="inner">
-      <a class="brand" href="../" data-internal>Spot the Spin</a>
-      <nav class="site-nav" aria-label="Main">
-        <ul>
-          <li><a href="../" data-internal>Game</a></li>
-          <li><a href="../analyze/" data-internal>Analyze</a></li>
-          <li><a href="./" data-internal aria-current="page">Metrics</a></li>
-        </ul>
-      </nav>
+  <header class="masthead paper">
+    <div class="masthead-top">
+      <span class="edition">Back page · The record, corrected and uncorrected</span>
+      <span id="masthead-date" class="dateline"></span>
+      <button type="button" id="radio-toggle" class="radio-toggle" aria-pressed="false" aria-label="Background music: old-time radio">
+        <svg class="radio-icon" viewBox="0 0 40 32" aria-hidden="true" focusable="false">
+          <rect x="2" y="7" width="36" height="23" rx="5" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 7 L26 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <g stroke="currentColor" stroke-width="1.5"><line x1="7" y1="13" x2="21" y2="13"/><line x1="7" y1="17" x2="21" y2="17"/><line x1="7" y1="21" x2="21" y2="21"/><line x1="7" y1="25" x2="21" y2="25"/></g>
+          <circle class="radio-knob" cx="30" cy="19" r="5" fill="none" stroke="currentColor" stroke-width="2"/>
+          <line class="radio-knob-mark" x1="30" y1="19" x2="30" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="radio-label">Radio</span>
+        <span class="radio-state" aria-hidden="true">off</span>
+      </button>
     </div>
+    <a class="masthead-title" href="../" data-internal>The Spin Gazette</a>
+    <p class="masthead-tag">Every headline has a story. Some have an angle.</p>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="../" data-internal>The Board</a></li>
+        <li><a href="../analyze/" data-internal>Analyze a text</a></li>
+        <li><a href="./" data-internal aria-current="page">Track record</a></li>
+      </ul>
+    </nav>
   </header>
 
-  <main id="metrics">
+  <main id="metrics" class="case-file">
     <div id="stub-banner" class="banner banner-bad" role="alert" hidden></div>
 
-    <h1>How well does the detector work?</h1>
-    <p class="lead">Results of the classifier on a frozen, held-out test set that was never used for prompt tuning. Every number shows its sample size n and a 95% Wilson interval. Each data source is reported separately; they are never merged into one number.</p>
+    <div class="paper sheet case-file-sheet">
+      <p class="folder-tab typewriter">Case file · track record</p>
+      <h1>How well does the detector work?</h1>
+      <p class="lead">Results of the classifier on a frozen, held-out test set that was never used for prompt tuning. Every number shows its sample size n and a 95% Wilson interval (drawn as an error bar). Each data source is reported separately; they are never merged into one number.</p>
 
-    <p id="metrics-status" class="status" role="status" aria-live="polite">Loading results...</p>
-    <div id="metrics-error" class="error" role="alert" hidden></div>
-    <div id="metrics-empty" class="empty-state" hidden>
-      <strong>No evaluation results have been published yet.</strong>
-      <p>This page only shows numbers from a real run of the classifier on the frozen test set. Until that run exists, there is nothing to show, so no charts are drawn.</p>
+      <p id="metrics-status" class="status" role="status" aria-live="polite">Loading results...</p>
+      <div id="metrics-error" class="error" role="alert" hidden></div>
+      <div id="metrics-empty" class="empty-state" hidden>
+        <strong>No evaluation results have been published yet.</strong>
+        <p>This page only shows numbers from a real run of the classifier on the frozen test set. Until that run exists, there is nothing to show, so no charts are drawn.</p>
+      </div>
+
+      <dl id="metrics-meta" class="meta-line typewriter" hidden></dl>
+
+      <details class="howto">
+        <summary><strong>How to read this page</strong></summary>
+        <ul>
+          <li><strong>False-positive rate (FPR) on "no technique"</strong>: of the texts that human annotators labelled as ordinary information, the share the system flagged with some technique. Lower is better. This is the number that tells you how often an honest headline gets wrongly accused.</li>
+          <li><strong>Precision</strong> of a technique: of the texts the system labelled with it, the share that really have it. <strong>Recall</strong>: of the texts that really have it, the share the system found.</li>
+          <li><strong>Wilson interval</strong>: the 95% range where the true value plausibly lies given n. Small n gives wide intervals: do not over-read differences whose intervals overlap.</li>
+          <li><strong>Confidence</strong> (High, Moderate, Disputed) is how strongly the system agrees with itself; it is not a probability. The calibration table checks whether "High" really is more accurate than "Moderate". See Methodology below.</li>
+          <li><strong>Disputed</strong> means the system could not settle on an answer; such texts are never shown as a confident verdict.</li>
+        </ul>
+      </details>
     </div>
-
-    <dl id="metrics-meta" class="small muted" hidden></dl>
-
-    <details class="card">
-      <summary><strong>How to read this page</strong></summary>
-      <ul>
-        <li><strong>False-positive rate (FPR) on "no technique"</strong>: of the texts that human annotators labelled as ordinary information, the share the system flagged with some technique. Lower is better. This is the number that tells you how often an honest headline gets wrongly accused.</li>
-        <li><strong>Precision</strong> of a technique: of the texts the system labelled with it, the share that really have it. <strong>Recall</strong>: of the texts that really have it, the share the system found.</li>
-        <li><strong>Wilson interval</strong>: the 95% range where the true value plausibly lies given n. Small n gives wide intervals: do not over-read differences whose intervals overlap.</li>
-        <li><strong>System confidence</strong> is the number of models (out of three different models) that agree. It is not a probability. The calibration table checks whether "3 of 3" really is more accurate than "2 of 3".</li>
-        <li><strong>Disputed</strong> means fewer than two models agree; such texts are not shown as a confident verdict.</li>
-      </ul>
-    </details>
 
     <div id="metrics-sources"></div>
 
-    <section aria-labelledby="h-limitations">
+    <section class="paper sheet" aria-labelledby="h-limitations">
       <h2 id="h-limitations">Known limitations</h2>
       <ul id="known-limitations">
-        <li>Domain shift: public datasets label sentences from full news articles, while the game uses headlines.</li>
+        <li>Domain shift: public datasets label sentences from full news articles or memes, while the game uses headlines.</li>
         <li>Public datasets may have leaked into the training data of the models, which can inflate their scores.</li>
         <li>Techniques outside our six (for example flag-waving, slogans, repetition) are excluded from evaluation rather than counted as "no technique".</li>
         <li>Small samples: intervals are wide, especially per technique.</li>
       </ul>
     </section>
+
+    <details id="methodology" class="paper sheet methodology">
+      <summary><h2 id="h-methodology">Methodology</h2></summary>
+      <p>The classifier is an ensemble of three different large language models from different vendors. Each model labels the text independently with the same prompt; the reference answer is the majority vote. Confidence is the agreement level: <strong>High confidence</strong> when all three agree, <strong>Moderate confidence</strong> when two of three agree, and <strong>Disputed</strong> when no two agree. Agreement is not a probability, and models from the same era can share the same blind spots, so agreement can be confidently wrong.</p>
+      <p>Flagging policies: by default a text is flagged when at least two of three models name a technique; the stricter policy needs all three.</p>
+      <p id="methodology-models" class="typewriter small"></p>
+      <div id="methodology-per-model"></div>
+    </details>
   </main>
 
   <footer class="site-footer">
     <p>Numbers are produced by the eval script from a frozen test set and rendered from its results file; the page does not run the models on each visit.</p>
   </footer>
+  <script src="../assets/radio.js" defer></script>
   <script type="module" src="../assets/metrics.js"></script>
 </body>
 </html>

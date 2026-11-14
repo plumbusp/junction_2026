@@ -1,19 +1,21 @@
 // Spot the Spin - Analyze page (frontend/analyze/index.html).
 //
 // Required element IDs (the smoke check relies on these):
-//   mock-banner, analyze, analyze-form, mode-text, mode-url, analyze-text, text-count, analyze-url,
-//   analyze-submit, analyze-status, analyze-error,
-//   analyze-result, result-mock-note, result-disputed, result-technique-label, result-technique,
-//   result-confidence, result-explanation, result-source, result-text, result-spans, result-votes
+//   mock-banner, masthead-date, radio-toggle, analyze, analyze-form, mode-text, mode-url, analyze-text,
+//   text-count, analyze-url, analyze-submit, analyze-status, analyze-error,
+//   analyze-result, result-mock-note, result-stamp, result-disputed, result-technique-label, result-technique,
+//   result-confidence, result-explanation, result-source, result-text, result-spans
 //
 // Endpoint: POST /api/analyze with {"text": ...} or {"url": ...}.
 // Response: a Verdict (technique, evidence_spans, explanation, agreement, n_models, disputed, votes)
 // plus "text" (the text that was analyzed, required for URL input) and optional "source_url", "title".
 // Highlight offsets are computed here by exact substring search; server offsets are not trusted.
+// Confidence is shown on the human scale (common.js `confidence`); individual votes and model names
+// are not shown here, only in the Methodology section of /metrics.
 
 import {
   isMock, mockCase, api, loadMock, initPage, techniqueLabel, findSpanRanges,
-  renderLayers, renderVotes, agreementText, el,
+  renderLayers, confidence, el, reducedMotion,
 } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
@@ -62,7 +64,7 @@ async function onSubmit(ev) {
     return;
   }
   $("analyze-submit").disabled = true;
-  $("analyze-status").textContent = "Asking three models... this can take a few seconds.";
+  $("analyze-status").textContent = "The desk is reading your text... this can take a few seconds.";
   try {
     const mockFile = mockCase === "disputed" ? "analyze_disputed.json" : undefined;
     const verdict = await api("POST", "/api/analyze", v.body, mockFile);
@@ -93,21 +95,33 @@ function render(verdict, body) {
   }
 
   const disputed = Boolean(verdict.disputed);
+  const c = confidence(verdict);
   const box = $("result-disputed");
   box.hidden = !disputed;
   box.textContent = "";
   if (disputed) {
     box.append(
-      el("strong", { text: "Disputed: the models disagree." }),
-      el("p", { text: `Only ${agreementText(verdict)}. This is not a confident verdict. Read the individual model answers below before drawing conclusions.` }),
+      el("strong", { text: "Disputed — no confident verdict." }),
+      el("p", { text: "The system could not settle on one answer for this text. The label below is only a fallback; do not draw conclusions from it." }),
     );
   }
 
-  $("result-technique-label").textContent = disputed ? "No confident answer. Fallback label:" : "Majority answer:";
+  const stamp = $("result-stamp");
+  stamp.textContent = c.stamp;
+  stamp.className = `stamp stamp-${c.key}`;
+  if (!reducedMotion() && stamp.animate) {
+    stamp.animate([
+      { transform: "rotate(var(--stamp-rot)) scale(2.4)", opacity: 0 },
+      { transform: "rotate(var(--stamp-rot)) scale(0.92)", opacity: 1, offset: 0.7 },
+      { transform: "rotate(var(--stamp-rot)) scale(1)", opacity: 1 },
+    ], { duration: 420, delay: 200, easing: "cubic-bezier(.3,.1,.6,1)", fill: "backwards" });
+  }
+
+  $("result-technique-label").textContent = disputed ? "No confident answer. Fallback label:" : "System's call:";
   $("result-technique").textContent = techniqueLabel(verdict.technique);
   const conf = $("result-confidence");
-  conf.textContent = disputed ? `disputed: ${agreementText(verdict)}` : `System confidence: ${agreementText(verdict)}`;
-  conf.className = `pill ${disputed ? "pill-warn" : verdict.agreement === verdict.n_models ? "pill-good" : ""}`;
+  conf.textContent = c.label;
+  conf.className = `pill pill-${c.key}`;
   $("result-explanation").textContent = verdict.explanation || "";
 
   const src = $("result-source");
@@ -129,7 +143,6 @@ function render(verdict, body) {
     spans.append(el("span", { class: "pill pill-warn", text: `${missing.length} span(s) not found in the text and not highlighted` }));
   }
 
-  renderVotes($("result-votes"), verdict);
   $("h-result").setAttribute("tabindex", "-1");
   $("h-result").focus();
 }

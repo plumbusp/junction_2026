@@ -5,7 +5,8 @@
 //   mock-banner, label, label-annotator, label-file, label-status, label-error, label-empty,
 //   label-workspace, label-position, label-progress, label-item-id, label-item-source,
 //   label-form, label-technique-options, label-words-hint, label-text, label-spans, label-notes,
-//   label-prev, label-clear, label-next, label-download, label-reset
+//   label-prev, label-clear, label-next, label-download, label-reset,
+//   radio-toggle (wired by assets/radio.js, which makes no network calls either)
 //
 // Input: a .json array of items, {"items": [...]}, or .jsonl; each item needs "text", optional "id", "source".
 // Output (.jsonl, one per labelled item):
@@ -20,7 +21,7 @@
     { id: "appeal_to_fear", label: "Appeal to fear", short: "Pressure through fear of what will happen." },
     { id: "exaggeration_minimization", label: "Exaggeration or minimization", short: "Overstating or understating the facts." },
     { id: "doubt", label: "Doubt", short: "Hints of doubt without evidence." },
-    { id: "vague_authority", label: "Vague authority", short: "Reference to unnamed experts or sources." },
+    { id: "vague_authority", label: "Appeal to authority", short: "An authority used instead of evidence, named or unnamed." },
     { id: "changing_subject", label: "Changing the subject", short: "Deflecting from the question." },
     { id: "no_technique", label: "No technique", short: "Ordinary information, no manipulation." }
   ];

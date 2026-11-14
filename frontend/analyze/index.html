@@ -4,31 +4,45 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Analyze a Text</title>
-  <meta name="description" content="Paste a text or a URL and see which manipulation technique three AI models find, with highlighted evidence.">
+  <meta name="description" content="Paste a text or a URL and see which manipulation technique the classifier finds, with highlighted evidence.">
   <link rel="stylesheet" href="../assets/style.css">
 </head>
-<body>
+<body class="page-analyze">
   <div id="mock-banner" class="mock-banner" role="note" hidden>
     Mock mode: the result is a canned response from frontend/mock/, not a live analysis.
   </div>
-  <header class="site-header">
-    <div class="inner">
-      <a class="brand" href="../" data-internal>Spot the Spin</a>
-      <nav class="site-nav" aria-label="Main">
-        <ul>
-          <li><a href="../" data-internal>Game</a></li>
-          <li><a href="./" data-internal aria-current="page">Analyze</a></li>
-          <li><a href="../metrics/" data-internal>Metrics</a></li>
-        </ul>
-      </nav>
+  <header class="masthead paper">
+    <div class="masthead-top">
+      <span class="edition">Reader's desk · Send us your clipping</span>
+      <span id="masthead-date" class="dateline"></span>
+      <button type="button" id="radio-toggle" class="radio-toggle" aria-pressed="false" aria-label="Background music: old-time radio">
+        <svg class="radio-icon" viewBox="0 0 40 32" aria-hidden="true" focusable="false">
+          <rect x="2" y="7" width="36" height="23" rx="5" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 7 L26 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <g stroke="currentColor" stroke-width="1.5"><line x1="7" y1="13" x2="21" y2="13"/><line x1="7" y1="17" x2="21" y2="17"/><line x1="7" y1="21" x2="21" y2="21"/><line x1="7" y1="25" x2="21" y2="25"/></g>
+          <circle class="radio-knob" cx="30" cy="19" r="5" fill="none" stroke="currentColor" stroke-width="2"/>
+          <line class="radio-knob-mark" x1="30" y1="19" x2="30" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="radio-label">Radio</span>
+        <span class="radio-state" aria-hidden="true">off</span>
+      </button>
     </div>
+    <a class="masthead-title" href="../" data-internal>The Spin Gazette</a>
+    <p class="masthead-tag">Every headline has a story. Some have an angle.</p>
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="../" data-internal>The Board</a></li>
+        <li><a href="./" data-internal aria-current="page">Analyze a text</a></li>
+        <li><a href="../metrics/" data-internal>Track record</a></li>
+      </ul>
+    </nav>
   </header>
 
   <main id="analyze">
-    <h1>Analyze a text</h1>
-    <p class="lead">Paste a headline or a short text, or give a news article URL. Three different AI models classify it with the same classifier the game uses; you see the technique, the evidence and how many models agree.</p>
+    <h1 class="board-heading">Analyze a text</h1>
+    <p class="lead-on-board">Type up a headline or a short text, or give a news article URL. The same classifier the game uses names the technique, marks the evidence and says how confident it is.</p>
 
-    <form id="analyze-form" class="card" novalidate>
+    <form id="analyze-form" class="paper sheet typewriter-sheet" novalidate>
       <fieldset>
         <legend>What do you want to analyze?</legend>
         <div class="inline-choices">
@@ -46,42 +60,41 @@
         <input type="url" id="analyze-url" name="url" placeholder="https://example.com/news/story" inputmode="url" autocomplete="off">
       </div>
       <div class="btn-row">
-        <button type="submit" id="analyze-submit" class="btn">Analyze</button>
+        <button type="submit" id="analyze-submit" class="btn btn-file">Send to the desk</button>
       </div>
       <p id="analyze-status" class="status" role="status" aria-live="polite"></p>
       <div id="analyze-error" class="error" role="alert" hidden></div>
     </form>
 
     <section id="analyze-result" aria-labelledby="h-result" hidden>
-      <h2 id="h-result">Result</h2>
+      <h2 id="h-result" class="board-heading">The desk's verdict</h2>
       <p id="result-mock-note" class="banner banner-info" hidden></p>
-      <div id="result-disputed" class="disputed-box" hidden></div>
-      <div class="card">
+      <div class="clipping paper reveal-clip pinned">
+        <div id="result-stamp" class="stamp" aria-hidden="true"></div>
+        <div id="result-disputed" class="disputed-box" hidden></div>
         <div class="verdict-head">
-          <span id="result-technique-label">Majority answer:</span>
+          <span id="result-technique-label" class="typewriter">System's call:</span>
           <span id="result-technique" class="verdict-technique"></span>
           <span id="result-confidence" class="pill"></span>
         </div>
-        <p class="small muted">System confidence is the number of models that agree, not a probability. The answer can be wrong; see <a href="../metrics/" data-internal>measured accuracy</a>.</p>
-        <p id="result-explanation"></p>
+        <p class="small muted-ink">This is the system's call, not the truth. Confidence says how strongly the system agrees with itself, not a probability; see the <a href="../metrics/" data-internal>measured track record</a>.</p>
+        <p id="result-explanation" class="explanation"></p>
+
+        <h3>Evidence in the text</h3>
+        <ul class="legend" aria-label="Highlight legend">
+          <li><span class="swatch swatch-ref" aria-hidden="true"></span>Evidence the system points to</li>
+        </ul>
+        <p id="result-source" class="small muted-ink" hidden></p>
+        <div id="result-text" class="analyzed-text"></div>
+        <p class="small">Evidence spans: <span id="result-spans"></span></p>
       </div>
-
-      <h3>Evidence in the text</h3>
-      <ul class="legend" aria-label="Highlight legend">
-        <li><span class="swatch swatch-ref" aria-hidden="true"></span>Evidence chosen by at least two models</li>
-      </ul>
-      <p id="result-source" class="small muted" hidden></p>
-      <div id="result-text" class="analyzed-text"></div>
-      <p class="small">Evidence spans: <span id="result-spans"></span></p>
-
-      <h3>How each model voted</h3>
-      <div id="result-votes"></div>
     </section>
   </main>
 
   <footer class="site-footer">
     <p>Texts you submit are sent to the classifier. Do not paste personal or confidential information.</p>
   </footer>
+  <script src="../assets/radio.js" defer></script>
   <script type="module" src="../assets/analyze.js"></script>
 </body>
 </html>

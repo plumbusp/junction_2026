@@ -24,7 +24,7 @@ export const TECHNIQUES = [
   { id: "appeal_to_fear", label: "Appeal to fear", short: "Pressure through fear of what will happen." },
   { id: "exaggeration_minimization", label: "Exaggeration or minimization", short: "Overstating or understating the facts." },
   { id: "doubt", label: "Doubt", short: "Hints of doubt without evidence." },
-  { id: "vague_authority", label: "Vague authority", short: "Reference to unnamed experts or sources." },
+  { id: "vague_authority", label: "Appeal to authority", short: "An authority used instead of evidence, named or unnamed." },
   { id: "changing_subject", label: "Changing the subject", short: "Deflecting from the question." },
   { id: "no_technique", label: "No technique", short: "Ordinary information, no manipulation." },
 ];
@@ -35,6 +35,8 @@ export function techniqueLabel(id) {
   if (id === null || id === undefined || id === "") return "none";
   return TECHNIQUE_BY_ID[id] ? TECHNIQUE_BY_ID[id].label : String(id);
 }
+
+export const reducedMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // ---------- Mock mode ----------
 
@@ -110,7 +112,10 @@ export async function api(method, path, body, mockFile) {
   return data;
 }
 
-/** Show the mock banner and keep ?mock=1 on internal navigation links. */
+/**
+ * Shared page setup: mock banner, ?mock=1 kept on internal links, the masthead date line,
+ * and the "turn the page" transition between documents.
+ */
 export function initPage() {
   const banner = document.getElementById("mock-banner");
   if (isMock) {
@@ -121,6 +126,22 @@ export function initPage() {
       a.setAttribute("href", url.pathname + url.search);
     });
   }
+  const dateline = document.getElementById("masthead-date");
+  if (dateline) {
+    dateline.textContent = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  }
+  document.addEventListener("click", (ev) => {
+    const a = ev.target.closest && ev.target.closest("a[data-internal]");
+    if (!a || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+    const target = new URL(a.href, window.location.href);
+    if (target.origin !== window.location.origin || reducedMotion()) return;
+    if (target.pathname === window.location.pathname && target.hash) return;
+    ev.preventDefault();
+    document.body.classList.add("page-leaving");
+    setTimeout(() => { window.location.href = target.href; }, 280);
+  });
+  // Coming back through the history cache must not leave the page "turned away".
+  window.addEventListener("pageshow", () => document.body.classList.remove("page-leaving"));
 }
 
 // ---------- Text helpers ----------
@@ -261,49 +282,63 @@ export function num(x, digits = 2) {
 
 // ---------- Verdict helpers ----------
 
-export function agreementText(verdict) {
-  const a = Number.isFinite(verdict.agreement) ? verdict.agreement : "?";
-  const n = Number.isFinite(verdict.n_models) ? verdict.n_models : "?";
-  return `${a} of ${n} models agree`;
+/**
+ * Human confidence scale (user decision): the game and Analyze never count models.
+ *   disputed            -> "Disputed — no confident verdict"
+ *   everyone agrees     -> "High confidence"
+ *   a majority agrees   -> "Moderate confidence"
+ * Confidence is agreement inside the classifier ensemble, not a probability (explained on /metrics).
+ */
+export function confidence(verdict) {
+  if (verdict.disputed) {
+    return { key: "disputed", label: "Disputed — no confident verdict", stamp: "Disputed" };
+  }
+  const a = verdict.agreement;
+  const n = verdict.n_models;
+  if (Number.isFinite(a) && Number.isFinite(n) && a >= n) {
+    return { key: "high", label: "High confidence", stamp: "Confirmed" };
+  }
+  return { key: "moderate", label: "Moderate confidence", stamp: "Probable" };
 }
 
-/** Table of individual model votes, so disagreement is never hidden. */
-export function renderVotes(el, verdict) {
-  el.textContent = "";
-  const votes = Array.isArray(verdict.votes) ? verdict.votes : [];
-  if (votes.length === 0) {
-    const p = document.createElement("p");
-    p.className = "muted";
-    p.textContent = "Individual model votes were not returned.";
-    el.append(p);
+/** Map a /metrics agreement level ("3/3", "2/3", "disputed") to the same scale. */
+export function confidenceForLevel(level) {
+  if (level === "disputed") return "Disputed";
+  const m = /^(\d+)\/(\d+)$/.exec(String(level));
+  if (m && m[1] === m[2]) return "High confidence";
+  return "Moderate confidence";
+}
+
+/** Roll a number up from 0 in `node` (text only); instant when reduced motion is on. */
+export function rollNumber(node, target, suffix = "", ms = 900) {
+  if (!Number.isFinite(target) || reducedMotion()) {
+    node.textContent = `${target}${suffix}`;
     return;
   }
-  const wrap = document.createElement("div");
-  wrap.className = "table-wrap";
-  const table = document.createElement("table");
-  table.className = "data";
-  table.innerHTML = "<caption>Each model's answer. The reference answer is the majority vote.</caption>"
-    + "<thead><tr><th scope=\"col\">Model</th><th scope=\"col\">Technique</th><th scope=\"col\">Evidence</th><th scope=\"col\">Agrees with reference</th></tr></thead>";
-  const tbody = document.createElement("tbody");
-  votes.forEach((v) => {
-    const tr = document.createElement("tr");
-    const cells = [
-      v.model || "unknown",
-      techniqueLabel(v.technique),
-      (v.evidence_spans || []).length ? (v.evidence_spans || []).map((s) => `"${s}"`).join(", ") : "none",
-      v.technique === verdict.technique ? "yes" : "no",
-    ];
-    cells.forEach((c, i) => {
-      const td = document.createElement(i === 0 ? "th" : "td");
-      if (i === 0) td.scope = "row";
-      td.textContent = c;
-      tr.append(td);
-    });
-    tbody.append(tr);
-  });
-  table.append(tbody);
-  wrap.append(table);
-  el.append(wrap);
+  let t0 = null;
+  let done = false;
+  const finish = () => { done = true; node.textContent = `${target}${suffix}`; };
+  const step = (t) => {
+    if (done) return;
+    if (t0 === null) t0 = t;
+    const f = Math.max(0, Math.min(1, (t - t0) / ms));
+    const eased = 1 - (1 - f) ** 3;
+    node.textContent = `${Math.round(target * eased)}${suffix}`;
+    if (f < 1) requestAnimationFrame(step);
+    else finish();
+  };
+  requestAnimationFrame(step);
+  // Animation frames pause in background tabs: make sure the final number always lands.
+  setTimeout(finish, ms + 150);
+}
+
+/** Slide-in for a freshly shown section (file folder sliding onto the desk). */
+export function slideIn(node, from = 24) {
+  if (!node || reducedMotion() || !node.animate) return;
+  node.animate(
+    [{ transform: `translateX(${from}px) rotate(0.6deg)`, opacity: 0 }, { transform: "none", opacity: 1 }],
+    { duration: 380, easing: "cubic-bezier(.2,.7,.2,1)" },
+  );
 }
 
 export function el(tag, attrs = {}, ...children) {

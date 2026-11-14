@@ -11,13 +11,25 @@
   <div id="mock-banner" class="mock-banner" role="note" hidden>
     Mock mode: sample candidates from frontend/mock/label_candidates.json (invented demo headlines, never for evaluation).
   </div>
-  <header class="site-header">
-    <div class="inner">
-      <span class="brand">Spot the Spin: labelling helper</span>
+  <header class="masthead paper masthead-compact">
+    <div class="masthead-top">
+      <span class="edition">Copy desk · Offline labelling helper</span>
+      <button type="button" id="radio-toggle" class="radio-toggle" aria-pressed="false" aria-label="Background music: old-time radio">
+        <svg class="radio-icon" viewBox="0 0 40 32" aria-hidden="true" focusable="false">
+          <rect x="2" y="7" width="36" height="23" rx="5" fill="currentColor" opacity=".18" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 7 L26 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <g stroke="currentColor" stroke-width="1.5"><line x1="7" y1="13" x2="21" y2="13"/><line x1="7" y1="17" x2="21" y2="17"/><line x1="7" y1="21" x2="21" y2="21"/><line x1="7" y1="25" x2="21" y2="25"/></g>
+          <circle class="radio-knob" cx="30" cy="19" r="5" fill="none" stroke="currentColor" stroke-width="2"/>
+          <line class="radio-knob-mark" x1="30" y1="19" x2="30" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span class="radio-label">Radio</span>
+        <span class="radio-state" aria-hidden="true">off</span>
+      </button>
     </div>
+    <span class="masthead-title">The Spin Gazette: copy desk</span>
   </header>
 
-  <main id="label">
+  <main id="label" class="paper sheet label-sheet">
     <h1>Label headlines for the gold set</h1>
     <p class="lead">Works fully offline: nothing is sent anywhere. Label on your own, before seeing any model output or the other annotator's labels. Any labels already present in the input file are ignored and not shown.</p>
 
@@ -78,6 +90,7 @@
   <footer class="site-footer">
     <p>Real headlines only: synthetic (AI-written) headlines must never be labelled into the evaluation set.</p>
   </footer>
+  <script src="../assets/radio.js" defer></script>
   <script src="../assets/label.js"></script>
 </body>
 </html>

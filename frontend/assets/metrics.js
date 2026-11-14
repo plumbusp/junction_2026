@@ -1,17 +1,19 @@
 // Spot the Spin - /metrics page (frontend/metrics/index.html).
 //
 // Required element IDs (the smoke check relies on these):
-//   mock-banner, metrics, stub-banner, metrics-status, metrics-error, metrics-empty, metrics-meta,
-//   metrics-sources, known-limitations
+//   mock-banner, masthead-date, radio-toggle, metrics, stub-banner, metrics-status, metrics-error,
+//   metrics-empty, metrics-meta, metrics-sources, known-limitations,
+//   methodology, methodology-models, methodology-per-model
 // Generated per source <key>: source-<key>, fpr-<key>, per-technique-<key>, confusion-<key>,
-//   calibration-<key>, policies-<key>, per-model-<key>, human-ceiling-<key>
+//   calibration-<key>, policies-<key>, human-ceiling-<key>,
+//   per-model-<key> (inside #methodology-per-model: model IDs appear only in the Methodology section)
 //
 // Endpoint: GET /api/metrics -> eval results JSON (see mock/metrics.json for the shape).
 // 404 means no real results exist yet: the page says so and draws no charts.
 // Any "mode" other than "live" shows the stub warning banner.
 
 import {
-  isMock, api, ApiError, initPage, techniqueLabel, proportion, pct, num, el,
+  isMock, api, ApiError, initPage, techniqueLabel, proportion, pct, num, el, confidenceForLevel,
 } from "./common.js";
 
 const $ = (id) => document.getElementById(id);
@@ -129,7 +131,7 @@ function renderPolicies(key, src) {
     el("th", { scope: "col", class: "num", text: "95% Wilson" }), el("th", { scope: "col", text: "Recall 0% to 100%" })];
   return el("section", {},
     el("h3", { text: "False-positive trade-off" }),
-    el("p", { class: "small", text: "Requiring all three models to agree flags fewer honest texts, but also misses more manipulation. Recall here counts a text with any technique as found if the system flagged any technique." }),
+    el("p", { class: "small", text: "Flagging only at High confidence wrongly accuses fewer honest texts, but also misses more manipulation. Recall here counts a text with any technique as found if the system flagged any technique." }),
     table(`policies-${key}`, "False-positive rate versus recall for two flagging rules", head, rows));
 }
 
@@ -183,13 +185,13 @@ function renderCalibration(key, src) {
   const levels = src.by_agreement || [];
   if (!levels.length) return null;
   const rows = levels.map((lv) => el("tr", {},
-    el("th", { scope: "row", text: lv.level === "disputed" ? "disputed (fewer than 2 agree)" : `${lv.level.replace("/", " of ")} models agree` }),
+    el("th", { scope: "row", text: `${confidenceForLevel(lv.level)} (${lv.level === "disputed" ? "no majority" : `${lv.level} agree`})` }),
     propCells(lv.accuracy, `Accuracy at ${lv.level}`)));
-  const head = [el("th", { scope: "col", text: "System confidence" }), ...propHeaders("Accuracy")];
+  const head = [el("th", { scope: "col", text: "Confidence level" }), ...propHeaders("Accuracy")];
   return el("section", {},
-    el("h3", { text: "Calibration by model agreement" }),
-    el("p", { class: "small", text: "If agreement is a useful confidence signal, accuracy should drop from 3 of 3 to 2 of 3 to disputed." }),
-    table(`calibration-${key}`, "Accuracy grouped by how many models agreed", head, rows));
+    el("h3", { text: "Calibration by confidence level" }),
+    el("p", { class: "small", text: "If confidence is a useful signal, accuracy should drop from High to Moderate to Disputed." }),
+    table(`calibration-${key}`, "Accuracy grouped by confidence level", head, rows));
 }
 
 function renderPerModel(key, src) {
@@ -203,7 +205,7 @@ function renderPerModel(key, src) {
   const head = [el("th", { scope: "col", text: "Model" }), ...propHeaders("Accuracy"),
     el("th", { scope: "col", class: "num", text: "Macro-F1" }), ...propHeaders("FPR")];
   return el("section", {},
-    el("h3", { text: "Single models versus the ensemble" }),
+    el("h3", { text: `Single models versus the ensemble: ${src.label || key}` }),
     table(`per-model-${key}`, "Each model alone compared with the majority vote", head, rows));
 }
 
@@ -220,7 +222,7 @@ function renderHuman(key, src) {
 }
 
 function renderSource(key, src) {
-  const section = el("section", { class: "source-section", id: `source-${key}`, "aria-labelledby": `h-source-${key}` });
+  const section = el("section", { class: "source-section paper sheet", id: `source-${key}`, "aria-labelledby": `h-source-${key}` });
   const n = Number.isFinite(src.n) ? src.n : 0;
   section.append(el("h2", { id: `h-source-${key}` }, `${src.label || key} `, el("span", { class: "pill", text: `n = ${n}` })));
   if (n === 0) {
@@ -237,8 +239,10 @@ function renderSource(key, src) {
   }
   [
     renderHeadline(key, src), renderPolicies(key, src), renderPerTechnique(key, src),
-    renderConfusion(key, src), renderCalibration(key, src), renderPerModel(key, src), renderHuman(key, src),
+    renderConfusion(key, src), renderCalibration(key, src), renderHuman(key, src),
   ].forEach((node) => { if (node) section.append(node); });
+  const perModel = renderPerModel(key, src);
+  if (perModel) $("methodology-per-model").append(perModel);
   if (section.querySelector("td.num") && [...section.querySelectorAll("td.num")].some((td) => td.textContent.endsWith("*"))) {
     section.append(el("p", { class: "small muted", text: "* interval computed in the browser from k and n (Wilson, 95%) because the results file did not include it." }));
   }
@@ -253,7 +257,6 @@ function renderMeta(data) {
     ["Mode", data.mode || "not marked"],
     ["Test set", data.eval_version],
     ["Prompt version", data.prompt_version],
-    ["Models", Array.isArray(data.core_models) ? data.core_models.join(", ") : null],
     ["Test set manifest SHA-256", data.manifest_sha256 ? `${String(data.manifest_sha256).slice(0, 12)}...` : null],
   ].filter(([, v]) => v);
   items.forEach(([k, v]) => meta.append(el("div", {}, el("dt", { class: "visually-hidden", text: k }), el("dd", { style: "margin:0", text: `${k}: ${v}` }))));
@@ -277,6 +280,9 @@ function renderStubBanner(data) {
 function render(data) {
   renderStubBanner(data);
   renderMeta(data);
+  $("methodology-models").textContent = Array.isArray(data.core_models) && data.core_models.length
+    ? `Models in this run: ${data.core_models.join(", ")}.`
+    : "The results file does not list the models.";
   const container = $("metrics-sources");
   container.textContent = "";
   const sources = data.sources && typeof data.sources === "object" ? data.sources : {};
