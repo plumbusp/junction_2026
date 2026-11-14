@@ -3,6 +3,8 @@
     uv run python scripts/news/run_daily.py --dry-run     # fixtures only, no network
     uv run python scripts/news/run_daily.py               # live: fetches the configured feeds
     uv run python scripts/news/run_daily.py --live --seed # full pipeline once for today
+    uv run python scripts/news/run_daily.py --live --seed --rebuild-today
+                                          # redo today's rounds (answered ones are kept)
 
 Without --seed this writes data/news/candidates-YYYY-MM-DD.jsonl (inputs to human
 labelling, not labels). With --live --seed it runs the whole daily pipeline once for
@@ -13,7 +15,7 @@ only, never headline text. Labelling in CORE_MODE=live calls the paid models.
 
 The production image does not contain scripts/. There use the same pipeline as a module:
 
-    docker exec spotthespin-app-1 python -m app.news.daily [--force]
+    docker exec spotthespin-app-1 python -m app.news.daily [--force] [--rebuild-today]
 """
 
 from __future__ import annotations
@@ -78,6 +80,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="with --seed: run even if today's run already succeeded",
     )
     parser.add_argument(
+        "--rebuild-today",
+        action="store_true",
+        help=(
+            "with --live --seed: delete today's designation and today's rounds without "
+            "answers or disputes, then rebuild them (implies --force)"
+        ),
+    )
+    parser.add_argument(
         "--db-path",
         type=Path,
         default=None,
@@ -92,9 +102,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.seed:
         if args.dry_run or not args.live:
             parser.error("--seed needs --live and cannot be combined with --dry-run")
-        return daily.run_cli(args.db_path, force=args.force)
-    if args.force or args.db_path:
-        parser.error("--force and --db-path only apply with --live --seed")
+        return daily.run_cli(
+            args.db_path, force=args.force, rebuild_today=args.rebuild_today
+        )
+    if args.force or args.db_path or args.rebuild_today:
+        parser.error(
+            "--force, --rebuild-today and --db-path only apply with --live --seed"
+        )
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )

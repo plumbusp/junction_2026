@@ -6,8 +6,9 @@
 Reads one ``candidates-*.jsonl`` file written by ``scripts/news/run_daily.py``, labels
 every headline with the one core (``classify``; stub or live per ``CORE_MODE``) and
 inserts each event with ``app.db.insert_candidate_round``. That function drops headlines
-with a disputed reference and keeps the event only if three headlines including a
-``no_technique`` one remain. This is the manual path; the daily job (``app.news.daily``) does the same from live feeds.
+with a disputed reference, picks the three headlines with the most distinct reference
+techniques and keeps the event only if three headlines including a ``no_technique`` one
+(or three distinct techniques) remain. This is the manual path; the daily job (``app.news.daily``) does the same from live feeds.
 
 Live mode calls three models per headline and needs ``AI_ROUTER_API_KEY``; run it only
 when live calls are approved. Headline text is not printed.

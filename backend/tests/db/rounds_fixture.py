@@ -87,6 +87,30 @@ def seed_simple_round(
     )
 
 
+def seed_round_with_techniques(
+    db_path: Path,
+    cluster_id: str,
+    techniques: tuple[str, str, str],
+    *,
+    n_outlets: int | None = None,
+    published: str = "2026-11-13T10:00:00Z",
+) -> db.InsertResult:
+    """A round of three invented headlines with the given reference techniques."""
+    items = [
+        {"text": f"Headline {i} ({cluster_id})", "outlet": f"Outlet {i}", "published": published}
+        for i in range(3)
+    ]
+    refs = [stub_verdict(t, [] if t == "no_technique" else ["x"]) for t in techniques]
+    return db.insert_candidate_round(
+        db_path,
+        event=f"Event {cluster_id}",
+        items=items,
+        references=refs,
+        cluster_id=cluster_id,
+        n_outlets=n_outlets,
+    )
+
+
 def seed_worked_example(
     db_path: Path, cluster_id: str = "fare-hike"
 ) -> db.InsertResult:

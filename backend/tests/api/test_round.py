@@ -26,7 +26,14 @@ def test_round_shape_has_three_headlines_one_clean_and_no_references(
     assert len(body["items"]) == 3
     assert all(set(item) == {"item_id", "text", "outlet"} for item in body["items"])
     # No reference answers or votes leak into the round.
-    for leaked in ("technique", "evidence_spans", "votes", "agreement", "explanation"):
+    for leaked in (
+        "technique",
+        "evidence_spans",
+        "votes",
+        "agreement",
+        "explanation",
+        "diversity",
+    ):
         assert leaked not in res.text
     # The disputed headline is excluded; one in-play headline is clean.
     assert DISPUTED not in [item["text"] for item in body["items"]]

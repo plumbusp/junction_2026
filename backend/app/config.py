@@ -37,8 +37,11 @@ class Settings:
     daily_tz: str = DEFAULT_DAILY_TZ
     # Used only when the IANA data for ``daily_tz`` is missing (slim images): EET.
     daily_tz_fallback_offset_minutes: int = 120
-    daily_max_clusters: int = 5
-    daily_max_headlines: int = 24
+    # Labelling caps (the paid step): clusters per run, headlines per cluster, headlines
+    # per run (shared fairly between the clusters).
+    daily_max_clusters: int = 8
+    daily_max_per_cluster: int = 6
+    daily_max_headlines: int = 48
 
 
 def _parse_list(raw: str) -> list[str]:
@@ -113,10 +116,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             14 * 60,
         ),
         daily_max_clusters=_parse_int(
-            "DAILY_MAX_CLUSTERS", environ.get("DAILY_MAX_CLUSTERS", ""), 5, 1, 50
+            "DAILY_MAX_CLUSTERS", environ.get("DAILY_MAX_CLUSTERS", ""), 8, 1, 50
+        ),
+        daily_max_per_cluster=_parse_int(
+            "DAILY_MAX_PER_CLUSTER", environ.get("DAILY_MAX_PER_CLUSTER", ""), 6, 3, 50
         ),
         daily_max_headlines=_parse_int(
-            "DAILY_MAX_HEADLINES", environ.get("DAILY_MAX_HEADLINES", ""), 24, 3, 500
+            "DAILY_MAX_HEADLINES", environ.get("DAILY_MAX_HEADLINES", ""), 48, 3, 500
         ),
     )
 

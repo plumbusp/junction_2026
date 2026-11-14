@@ -3,7 +3,7 @@
 Used by the in-process scheduler (``app.scheduler``) and by the CLI, which also works in
 the production container where ``scripts/`` is not shipped:
 
-    docker exec spotthespin-app-1 python -m app.news.daily [--force]
+    docker exec spotthespin-app-1 python -m app.news.daily [--force] [--rebuild-today]
 
 The ``job_runs`` row makes a date run at most once, across restarts and across processes
 (the CLI next to the server). Output and logs carry counts and error class names only:
@@ -44,6 +44,7 @@ class RunOutcome:
     counts: dict[str, int] = field(default_factory=dict)
     failed_outlets: list[str] = field(default_factory=list)
     daily_round_id: str | None = None
+    daily_diversity: int | None = None
     error: str = ""
 
 
@@ -53,19 +54,28 @@ def run_daily_job(
     local_date: date,
     *,
     force: bool = False,
+    rebuild: bool = False,
     now: datetime | None = None,
     pipeline: Pipeline = job.run_live_rounds,
     **pipeline_kwargs,
 ) -> RunOutcome:
-    """Run the pipeline for ``local_date`` unless the job_runs row says it must not run."""
+    """Run the pipeline for ``local_date`` unless the job_runs row says it must not run.
+
+    ``rebuild`` (``--rebuild-today``) implies ``force`` and has the pipeline delete today's
+    unanswered rounds and designation first. The claim is taken before anything is deleted,
+    so a rebuild never runs next to another run: a live ``running`` row (the server's job,
+    another CLI) or the in-process lock refuses it, and nothing is touched.
+    """
     if not _RUN_LOCK.acquire(blocking=False):
         return RunOutcome("busy")
     try:
         started = now or datetime.now(UTC)
         key = local_date.isoformat()
-        claim = db.claim_job_run(db_path, key, now=started, force=force)
+        claim = db.claim_job_run(db_path, key, now=started, force=force or rebuild)
         if not claim.claimed:
             return RunOutcome(claim.reason, claim.attempts, claim.retry_at)
+        if rebuild:
+            pipeline_kwargs["rebuild"] = True
         try:
             result = pipeline(
                 db_path, settings, local_date=key, now=started, **pipeline_kwargs
@@ -92,6 +102,7 @@ def run_daily_job(
             counts=counts,
             failed_outlets=result.failed_outlets,
             daily_round_id=result.daily_round_id,
+            daily_diversity=result.daily_diversity,
         )
     finally:
         _RUN_LOCK.release()
@@ -106,6 +117,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="run even if today's run already succeeded"
     )
     parser.add_argument(
+        "--rebuild-today",
+        action="store_true",
+        help=(
+            "delete today's designation and today's rounds without answers or disputes, "
+            "then run again (the verdict cache avoids re-paying for labelled headlines)"
+        ),
+    )
+    parser.add_argument(
         "--db-path",
         type=Path,
         default=None,
@@ -114,7 +133,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_cli(db_path: Path | None = None, *, force: bool = False) -> int:
+def run_cli(
+    db_path: Path | None = None, *, force: bool = False, rebuild_today: bool = False
+) -> int:
     """Run once for today and print counts only. Exit code 1 when the run failed."""
     logging.basicConfig(
         level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s"
@@ -122,7 +143,9 @@ def run_cli(db_path: Path | None = None, *, force: bool = False) -> int:
     settings = get_settings()
     path = db_path or settings.db_path
     today = local_today(settings)
-    outcome = run_daily_job(settings, path, today, force=force)
+    outcome = run_daily_job(
+        settings, path, today, force=force, rebuild=rebuild_today
+    )
 
     print(f"core mode: {settings.core_mode}")
     print(f"local date: {today.isoformat()} ({settings.daily_tz})")
@@ -141,13 +164,18 @@ def run_cli(db_path: Path | None = None, *, force: bool = False) -> int:
         print(
             f"daily challenge: {outcome.daily_round_id or 'none (no eligible round)'}"
         )
+        if outcome.daily_round_id and (outcome.daily_diversity or 0) < 3:
+            print(
+                f"note: the daily has only {outcome.daily_diversity or 0} distinct "
+                "technique(s); today's labelled pool lacked variety"
+            )
     print(f"database: {path}")
     return 1 if outcome.status == "failed" else 0
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return run_cli(args.db_path, force=args.force)
+    return run_cli(args.db_path, force=args.force, rebuild_today=args.rebuild_today)
 
 
 if __name__ == "__main__":

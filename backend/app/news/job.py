@@ -17,7 +17,7 @@ import logging
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 import httpx
@@ -38,6 +38,7 @@ from app.news.cluster import (
 )
 from app.news.feeds import FEEDS, LEANING_CAVEAT, Feed, check_unique
 from app.news.rss import NewsItem, fetch_items, parse_feed
+from app.scheduler import settings_tz
 
 log = logging.getLogger(__name__)
 
@@ -247,7 +248,10 @@ class LiveRoundsResult:
     n_ready: int = 0
     n_ineligible: int = 0
     n_unlabelled_clusters: int = 0  # skipped: no model answered, retried later
+    n_rounds_deleted: int = 0  # --rebuild-today: today's unanswered rounds removed
+    n_rounds_kept: int = 0  # --rebuild-today: today's rounds with answers/disputes
     daily_round_id: str | None = None
+    daily_diversity: int | None = None  # distinct techniques in the daily (None: no daily)
     ready_round_ids: list[str] = field(default_factory=list)
 
     def counts(self) -> dict[str, int]:
@@ -264,7 +268,11 @@ class LiveRoundsResult:
             "ready": self.n_ready,
             "ineligible": self.n_ineligible,
             "unlabelled_clusters": self.n_unlabelled_clusters,
+            "rounds_deleted": self.n_rounds_deleted,
+            "rounds_kept": self.n_rounds_kept,
             "daily": int(self.daily_round_id is not None),
+            # 0 when there is no daily; below 3 means the day's pool lacked variety.
+            "daily_diversity": self.daily_diversity or 0,
         }
 
 
@@ -294,6 +302,15 @@ def select_headlines(cluster: Cluster, limit: int) -> list[NewsItem]:
     return (first + rest)[:limit]
 
 
+def _local_day_bounds(settings: Settings, local_date: str) -> tuple[datetime, datetime]:
+    """Start (inclusive) and end (exclusive) of the local day ``local_date`` as aware datetimes."""
+    tz = settings_tz(settings)
+    day = date.fromisoformat(local_date)
+    start = datetime.combine(day, time.min, tzinfo=tz)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz)
+    return start, end
+
+
 def _check_cache_writable() -> None:
     """Fail before spending anything if verdicts could not be cached afterwards."""
     probe = CACHE_DIR / f".write-test-{uuid.uuid4().hex}"
@@ -317,16 +334,25 @@ def run_live_rounds(
     threshold: float = DEFAULT_THRESHOLD,
     window_hours: int = DEFAULT_WINDOW_HOURS,
     min_outlets: int = DEFAULT_MIN_OUTLETS,
+    rebuild: bool = False,
 ) -> LiveRoundsResult:
     """Fetch live feeds, label the best clusters and store them as rounds.
 
     Labelling is the only paid step, so it is capped: at most
-    ``settings.daily_max_clusters`` clusters and ``settings.daily_max_headlines``
-    headlines in total (the budget is shared fairly between the clusters). Clusters
-    already stored are not labelled again. ``classify_fn`` defaults to the one core; in
-    live mode a stub verdict raises ``StubVerdictError`` and, with the default core, a
-    missing key or an unwritable verdict cache fails before any model is called. Finally
-    one ready round of this run is designated the daily challenge for ``local_date``.
+    ``settings.daily_max_clusters`` clusters, ``settings.daily_max_per_cluster`` headlines
+    per cluster (newest per outlet first) and ``settings.daily_max_headlines`` headlines in
+    total (the budget is shared fairly between the clusters). Clusters already stored are
+    not labelled again; the verdict cache keeps re-labelling free. ``classify_fn`` defaults
+    to the one core; in live mode a stub verdict raises ``StubVerdictError`` and, with the
+    default core, a missing key or an unwritable verdict cache fails before any model is
+    called. Each cluster becomes a round whose three headlines have the most distinct
+    reference techniques; finally the most diverse, then most novel ready round is
+    designated the daily challenge for ``local_date``.
+
+    ``rebuild`` (``--rebuild-today``): once the feeds were fetched and clustered, today's
+    unanswered rounds and today's designation are deleted (``db.reset_day``), so their
+    clusters are labelled and stored again. Today's rounds with answers or disputes are
+    kept but only re-picked when no other ready round exists.
     """
     live = settings.core_mode == "live"
     if classify_fn is None:
@@ -356,8 +382,24 @@ def run_live_rounds(
     top = rank_clusters(candidates)[: settings.daily_max_clusters]
     result.n_clusters_used = len(top)
 
+    kept: frozenset[str] = frozenset()
+    if rebuild:
+        # Only now: an outage of every feed must not leave the day without its rounds.
+        start, end = _local_day_bounds(settings, local_date)
+        reset = db.reset_day(
+            db_path,
+            local_date,
+            created_from=start,
+            created_to=end,
+            core_mode=settings.core_mode,
+        )
+        kept = reset.kept_round_ids
+        result.n_rounds_deleted = reset.deleted
+        result.n_rounds_kept = reset.kept
+
     feed_names = {f.outlet: f.name for f in feeds}
     pool: list[str] = []
+    fallback: list[str] = []  # kept (answered) rounds: used only if nothing else is ready
     pending: list[Cluster] = []
     for cluster in top:
         stored = db.get_round_by_cluster(db_path, cluster.cluster_id)
@@ -366,14 +408,19 @@ def run_live_rounds(
             continue
         result.n_rounds_existing += 1
         if stored.status == db.STATUS_READY:
-            pool.append(stored.round_id)
+            (fallback if stored.round_id in kept else pool).append(stored.round_id)
 
     remaining = settings.daily_max_headlines
     for index, cluster in enumerate(pending):
         if remaining < MIN_LABELLED_PER_CLUSTER:
             break
         share = remaining // (len(pending) - index)
-        limit = min(len(cluster.items), max(MIN_LABELLED_PER_CLUSTER, share), remaining)
+        limit = min(
+            len(cluster.items),
+            settings.daily_max_per_cluster,
+            max(MIN_LABELLED_PER_CLUSTER, share),
+            remaining,
+        )
         chosen = select_headlines(cluster, limit)
         verdicts: list[Verdict] = []
         for item in chosen:
@@ -415,15 +462,24 @@ def run_live_rounds(
         if inserted.status == db.STATUS_READY:
             pool.append(inserted.round_id)
 
-    result.n_ready = len(pool)
-    result.n_ineligible = result.n_rounds_new + result.n_rounds_existing - len(pool)
-    result.ready_round_ids = pool
+    n_ready = len(pool) + len(fallback)
+    result.n_ready = n_ready
+    result.n_ineligible = result.n_rounds_new + result.n_rounds_existing - n_ready
+    result.ready_round_ids = pool + fallback
     result.daily_round_id = db.pick_daily_challenge(
         db_path, local_date, pool, settings.core_mode
-    )
+    ) or db.pick_daily_challenge(db_path, local_date, fallback, settings.core_mode)
+    if result.daily_round_id is not None:
+        result.daily_diversity = db.get_round_diversity(db_path, result.daily_round_id)
     if result.n_unlabelled_clusters and not (
         result.n_rounds_new or result.n_rounds_existing
     ):
         raise LabellingUnavailableError("no cluster could be labelled")
     log.info("daily rounds: %s", result.counts())
+    if result.daily_diversity is not None and result.daily_diversity < 3:
+        log.warning(
+            "daily challenge has only %d distinct technique(s): the labelled pool "
+            "lacked variety",
+            result.daily_diversity,
+        )
     return result

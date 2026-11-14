@@ -41,7 +41,7 @@ def _settings(**overrides) -> Settings:
     return Settings(**params)
 
 
-def _run(tmp_db_path, fixture_feeds, labeller, **overrides):
+def _run(tmp_db_path, fixture_feeds, labeller, *, rebuild=False, **overrides):
     feeds, client = fixture_feeds()
     return job.run_live_rounds(
         tmp_db_path,
@@ -51,6 +51,7 @@ def _run(tmp_db_path, fixture_feeds, labeller, **overrides):
         client=client,
         now=FIXTURE_NOW,
         classify_fn=labeller,
+        rebuild=rebuild,
     )
 
 
@@ -111,6 +112,66 @@ def test_second_run_does_not_label_stored_clusters_again(
     assert labeller.calls == calls
     assert again.n_labelled == 0 and again.n_rounds_existing == 2
     assert again.daily_round_id == first.daily_round_id
+
+
+class Varied:
+    """Cycles through five techniques, so every cluster can show distinct ones."""
+
+    CYCLE = ("no_technique", "loaded_language", "doubt", "appeal_to_fear", "vague_authority")
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, text: str):
+        technique = self.CYCLE[self.calls % len(self.CYCLE)]
+        self.calls += 1
+        return stub_verdict(technique, [] if technique == "no_technique" else [text.split()[0]])
+
+
+def test_rounds_use_the_per_cluster_cap_and_record_diversity(
+    tmp_db_path, fixture_feeds
+) -> None:
+    labeller = Varied()
+
+    result = _run(tmp_db_path, fixture_feeds, labeller, daily_max_per_cluster=3)
+
+    assert labeller.calls <= 3 * result.n_clusters_used
+    assert result.daily_diversity == 3
+    assert result.counts()["daily_diversity"] == 3
+
+
+def test_rebuild_today_replaces_unanswered_rounds_and_keeps_answered_ones(
+    tmp_db_path, fixture_feeds, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(db, "_now", lambda: "2026-11-13T12:00:00Z")  # fake clock, in DAY
+    first = _run(tmp_db_path, fixture_feeds, Labeller())
+    answered = first.daily_round_id
+    item = db.get_round(tmp_db_path, answered).items[0]
+    db.insert_answer(
+        tmp_db_path,
+        player_id="p1",
+        round_id=answered,
+        item_id=item.item_id,
+        technique="doubt",
+        selected_words=[],
+        technique_points=0,
+        evidence_points=0,
+        total=0,
+    )
+    labeller = Varied()
+
+    rebuilt = _run(tmp_db_path, fixture_feeds, labeller, rebuild=True)
+
+    assert (rebuilt.n_rounds_deleted, rebuilt.n_rounds_kept) == (1, 1)
+    assert rebuilt.n_rounds_new == 1 and labeller.calls > 0  # the deleted cluster is rebuilt
+    assert rebuilt.n_ready == 2
+    # The answered round stays playable but is not re-picked while another one exists.
+    assert answered in db.list_ready_round_ids(tmp_db_path, "stub")
+    assert rebuilt.daily_round_id not in (None, answered)
+    assert db.get_daily_challenge(tmp_db_path, DAY) == rebuilt.daily_round_id
+    assert rebuilt.daily_diversity == db.get_round_diversity(
+        tmp_db_path, rebuilt.daily_round_id
+    )
 
 
 def test_live_mode_refuses_stub_verdicts(tmp_db_path, fixture_feeds) -> None:

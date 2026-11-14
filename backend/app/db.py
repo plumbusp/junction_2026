@@ -28,6 +28,7 @@ from app.game.rounds import Headline, build_round
 
 STATUS_READY = "ready"
 STATUS_INELIGIBLE = "ineligible"
+NOVELTY_WINDOW = 7  # previous daily challenges compared when ranking by novelty
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS rounds (
@@ -39,7 +40,9 @@ CREATE TABLE IF NOT EXISTS rounds (
     core_mode    TEXT NOT NULL CHECK (core_mode IN ('stub', 'live')),
     status       TEXT NOT NULL CHECK (status IN ('ready', 'ineligible')),
     created_at   TEXT NOT NULL,
-    n_outlets    INTEGER
+    n_outlets    INTEGER,
+    diversity    INTEGER,
+    techniques   TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS rounds_cluster_id
     ON rounds (cluster_id) WHERE cluster_id IS NOT NULL;
@@ -130,16 +133,44 @@ def _iso(moment: datetime) -> str:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring a database created by an older version up to date (additive only)."""
-    columns = {row[1] for row in conn.execute("PRAGMA table_info(rounds)")}
-    if "n_outlets" not in columns:
+    for name, decl in (
+        ("n_outlets", "INTEGER"),
+        ("diversity", "INTEGER"),
+        ("techniques", "TEXT"),
+    ):
+        if name in {row[1] for row in conn.execute("PRAGMA table_info(rounds)")}:
+            continue
         try:
-            conn.execute("ALTER TABLE rounds ADD COLUMN n_outlets INTEGER")
+            conn.execute(f"ALTER TABLE rounds ADD COLUMN {name} {decl}")
         except sqlite3.OperationalError:
             # A second process (the CLI next to the server) added it first.
-            if "n_outlets" not in {
+            if name not in {
                 row[1] for row in conn.execute("PRAGMA table_info(rounds)")
             }:
                 raise
+    _backfill_techniques(conn)
+
+
+def _backfill_techniques(conn: sqlite3.Connection) -> None:
+    """Derive ``diversity``/``techniques`` of ready rounds stored before those columns existed.
+
+    Computed from the stored in-play references only: nothing is relabelled or invented.
+    """
+    rows = conn.execute(
+        "SELECT round_id FROM rounds WHERE status = ? AND techniques IS NULL",
+        (STATUS_READY,),
+    ).fetchall()
+    for row in rows:
+        refs = conn.execute(
+            "SELECT reference FROM round_items WHERE round_id = ? AND position IS NOT NULL",
+            (row[0],),
+        ).fetchall()
+        techniques = sorted({json.loads(ref[0])["technique"] for ref in refs})
+        if techniques:
+            conn.execute(
+                "UPDATE rounds SET diversity = ?, techniques = ? WHERE round_id = ?",
+                (len(techniques), json.dumps(techniques), row[0]),
+            )
 
 
 def init_db(db_path: Path | str) -> None:
@@ -208,6 +239,7 @@ class InsertResult:
     n_items: int
     n_in_play: int
     reason: str = ""
+    diversity: int = 0  # distinct reference techniques among the in-play items (0: none)
 
 
 @dataclass(frozen=True)
@@ -253,9 +285,12 @@ def insert_candidate_round(
 
     ``items``: dicts with ``text`` and optional ``outlet``, ``link``, ``published``,
     ``declared_leaning``. ``references``: one ``Verdict`` per item from ``classify``.
-    Headlines with a disputed reference are stored but excluded before ``build_round``.
-    The round is ``ready`` when ``build_round`` succeeds (three headlines, at least one
-    ``no_technique``), else ``ineligible``. Re-inserting a known ``cluster_id`` is a
+    Headlines with a disputed reference are stored but excluded before ``build_round``,
+    which picks the three with the most distinct reference techniques (and a
+    ``no_technique`` one when the event has one). The round is ``ready`` when
+    ``build_round`` succeeds, else ``ineligible``; a ready round records ``diversity``
+    (1-3) and the sorted ``techniques`` list (internal, never served to players).
+    Re-inserting a known ``cluster_id`` is a
     no-op that returns the stored round. ``core_mode`` is derived from the verdicts.
     ``n_outlets`` is the number of distinct outlets of the whole event (it can exceed the
     stored items when the news job labels only a sample); default: distinct outlets in
@@ -305,12 +340,17 @@ def insert_candidate_round(
             if not ref.disputed
         ]
         positions: dict[str, int] = {}
+        techniques: list[str] = []
         reason = ""
         try:
             chosen = build_round(pool, rng_seed=round_id)
             positions = {h.id: pos for pos, h in enumerate(chosen.headlines)}
+            techniques = list(chosen.techniques)
         except ValueError:
-            reason = "needs three undisputed headlines including a no_technique one"
+            reason = (
+                "needs three undisputed headlines including a no_technique one "
+                "or three distinct techniques"
+            )
         status = STATUS_READY if positions else STATUS_INELIGIBLE
         core_mode = "stub" if any(is_stub_verdict(r) for r in references) else "live"
         if n_outlets is None:
@@ -318,8 +358,8 @@ def insert_candidate_round(
 
         conn.execute(
             "INSERT INTO rounds (round_id, cluster_id, event, event_date, source_note,"
-            " core_mode, status, created_at, n_outlets)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " core_mode, status, created_at, n_outlets, diversity, techniques)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 round_id,
                 cluster_id,
@@ -330,6 +370,8 @@ def insert_candidate_round(
                 status,
                 _now(),
                 n_outlets,
+                len(techniques) if techniques else None,
+                json.dumps(techniques) if techniques else None,
             ),
         )
         for item_id, item, ref in zip(item_ids, items, references, strict=True):
@@ -357,6 +399,7 @@ def insert_candidate_round(
         n_items=len(items),
         n_in_play=len(positions),
         reason=reason,
+        diversity=len(techniques),
     )
 
 
@@ -469,9 +512,13 @@ def pick_daily_challenge(
     """Designate the daily challenge for ``local_date`` among ``round_ids``.
 
     An existing designation for the date is kept and returned, never replaced. Otherwise
-    the choice is the ready round in ``core_mode`` with the most distinct outlets (tie:
-    the freshest headline, then newest insert) that has not been a daily challenge before.
-    Returns None when no round qualifies.
+    the choice is the best ready round in ``core_mode`` that has not been a daily challenge
+    before, ranked by: (a) diversity, the number of distinct reference techniques, higher
+    first; (b) novelty, the number of the round's techniques not used by the previous
+    ``NOVELTY_WINDOW`` daily challenges, higher first; (c) distinct outlets of the event,
+    more first; (d) the freshest headline; then newest insert and id (deterministic).
+    The day is never left empty because diversity is low: the most diverse round wins even
+    below 3 (see ``get_round_diversity``). Returns None only when no round qualifies.
     """
     with connect(db_path) as conn:
         existing = conn.execute(
@@ -483,24 +530,114 @@ def pick_daily_challenge(
         if not ids:
             return None
         marks = ",".join("?" * len(ids))
-        row = conn.execute(
-            f"SELECT r.round_id FROM rounds r WHERE r.round_id IN ({marks})"
+        rows = conn.execute(
+            "SELECT r.round_id, r.diversity, r.techniques, r.created_at,"
+            " COALESCE(r.n_outlets, (SELECT COUNT(DISTINCT i.outlet) FROM round_items i"
+            "   WHERE i.round_id = r.round_id AND i.outlet != '')) AS outlets,"
+            " COALESCE((SELECT MAX(i.published) FROM round_items i"
+            "   WHERE i.round_id = r.round_id), '') AS freshest"
+            f" FROM rounds r WHERE r.round_id IN ({marks})"
             " AND r.status = ? AND r.core_mode = ?"
-            " AND r.round_id NOT IN (SELECT round_id FROM daily_challenge)"
-            " ORDER BY COALESCE(r.n_outlets, (SELECT COUNT(DISTINCT i.outlet)"
-            "   FROM round_items i WHERE i.round_id = r.round_id AND i.outlet != '')) DESC,"
-            " (SELECT MAX(i.published) FROM round_items i WHERE i.round_id = r.round_id) DESC,"
-            " r.created_at DESC, r.round_id LIMIT 1",
+            " AND r.round_id NOT IN (SELECT round_id FROM daily_challenge)",
             (*ids, STATUS_READY, core_mode),
-        ).fetchone()
-        if row is None:
+        ).fetchall()
+        if not rows:
             return None
+        recent = conn.execute(
+            "SELECT r.techniques FROM daily_challenge d JOIN rounds r"
+            " ON r.round_id = d.round_id WHERE d.local_date < ?"
+            " ORDER BY d.local_date DESC LIMIT ?",
+            (local_date, NOVELTY_WINDOW),
+        ).fetchall()
+        used: set[str] = set()
+        for entry in recent:
+            used.update(json.loads(entry["techniques"] or "[]"))
+
+        def novelty(row: sqlite3.Row) -> int:
+            return len(set(json.loads(row["techniques"] or "[]")) - used)
+
+        # Stable sorts from the least to the most significant key.
+        ranked = sorted(rows, key=lambda r: r["round_id"])
+        ranked.sort(key=lambda r: r["created_at"], reverse=True)
+        ranked.sort(key=lambda r: r["freshest"], reverse=True)
+        ranked.sort(key=lambda r: r["outlets"] or 0, reverse=True)
+        ranked.sort(key=novelty, reverse=True)
+        ranked.sort(key=lambda r: r["diversity"] or 0, reverse=True)
+        chosen = ranked[0]["round_id"]
         conn.execute(
             "INSERT INTO daily_challenge (local_date, round_id, chosen_at)"
             " VALUES (?, ?, ?)",
-            (local_date, row["round_id"], _now()),
+            (local_date, chosen, _now()),
         )
-    return row["round_id"]
+    return chosen
+
+
+def get_round_diversity(db_path: Path | str, round_id: str) -> int | None:
+    """Distinct reference techniques among a round's in-play items (1-3), or None."""
+    with connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT diversity FROM rounds WHERE round_id = ?", (round_id,)
+        ).fetchone()
+    return int(row["diversity"]) if row and row["diversity"] is not None else None
+
+
+@dataclass(frozen=True)
+class DayReset:
+    deleted: int
+    kept: int
+    kept_round_ids: frozenset[str]
+
+
+def reset_day(
+    db_path: Path | str,
+    local_date: str,
+    *,
+    created_from: datetime,
+    created_to: datetime,
+    core_mode: str,
+) -> DayReset:
+    """Undo one day's rounds so the daily job can rebuild them (``--rebuild-today``).
+
+    Deletes the ``local_date`` designation (when its round was labelled in ``core_mode``)
+    and every round in ``core_mode`` created in ``[created_from, created_to)`` that has no
+    recorded answers or disputes and is not another date's daily challenge. Rounds with
+    answers or disputes are kept untouched and returned so the caller can avoid re-picking
+    them. Rounds of the other core mode are never touched. The ``job_runs`` row of the
+    date is kept (the caller holds its claim) but its attempt counter restarts at 1.
+    """
+    lo, hi = _iso(created_from), _iso(created_to)
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            "DELETE FROM daily_challenge WHERE local_date = ? AND round_id IN"
+            " (SELECT round_id FROM rounds WHERE core_mode = ?)",
+            (local_date, core_mode),
+        )
+        today = conn.execute(
+            "SELECT round_id FROM rounds WHERE core_mode = ? AND created_at >= ?"
+            " AND created_at < ?",
+            (core_mode, lo, hi),
+        ).fetchall()
+        deleted = 0
+        kept: set[str] = set()
+        for row in today:
+            round_id = row["round_id"]
+            in_use = conn.execute(
+                "SELECT EXISTS (SELECT 1 FROM answers WHERE round_id = ?)"
+                " OR EXISTS (SELECT 1 FROM disputes WHERE round_id = ?)"
+                " OR EXISTS (SELECT 1 FROM daily_challenge WHERE round_id = ?)",
+                (round_id, round_id, round_id),
+            ).fetchone()[0]
+            if in_use:
+                kept.add(round_id)
+                continue
+            conn.execute("DELETE FROM round_items WHERE round_id = ?", (round_id,))
+            conn.execute("DELETE FROM rounds WHERE round_id = ?", (round_id,))
+            deleted += 1
+        conn.execute(
+            "UPDATE job_runs SET attempts = 1 WHERE run_date = ?", (local_date,)
+        )
+    return DayReset(deleted, len(kept), frozenset(kept))
 
 
 # ---------- Job runs (idempotency of the daily job) ----------

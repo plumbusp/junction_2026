@@ -5,7 +5,8 @@ produced in the current core mode are served, so stub-labelled rounds never appe
 live mode. Today's daily challenge (a round designated by the daily job for the current
 date in ``DAILY_TZ``) is served first; without one, or once the player has finished it,
 the newest unfinished round is served. With no playable round the endpoint answers 503
-``no_rounds``; headlines are never invented.
+``no_rounds``; headlines are never invented. A round's stored ``diversity`` and
+``techniques`` are internal (daily ranking only) and are never part of the response.
 """
 
 from __future__ import annotations

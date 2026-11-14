@@ -85,6 +85,33 @@ def test_a_run_inside_the_process_is_refused_while_another_holds_the_lock(
     assert outcome.status == "busy" and pipeline.dates == []
 
 
+def test_rebuild_today_reruns_a_finished_day_but_not_next_to_a_running_claim(
+    tmp_db_path: Path,
+) -> None:
+    seen: list[dict] = []
+
+    def pipeline(db_path, settings, *, local_date, now, **kwargs):
+        seen.append(kwargs)
+        return job.LiveRoundsResult(n_labelled=2, n_ready=1)
+
+    run = partial(
+        daily.run_daily_job, Settings(), tmp_db_path, pipeline=pipeline, now=T0
+    )
+    assert run(TODAY).status == "ok"
+    assert run(TODAY).status == "done"
+
+    rebuilt = run(TODAY, rebuild=True)
+
+    assert rebuilt.status == "ok" and seen[-1] == {"rebuild": True}
+    assert len(seen) == 2
+    assert db.get_job_run(tmp_db_path, "2026-11-14")["attempts"] >= 1
+    # Another live run holds the claim: the rebuild refuses before anything is deleted.
+    other = TODAY + timedelta(days=1)
+    db.claim_job_run(tmp_db_path, other.isoformat(), now=T0)
+    refused = run(other, rebuild=True)
+    assert refused.status == "running" and len(seen) == 2
+
+
 def _load_run_daily_script():
     spec = importlib.util.spec_from_file_location(
         "run_daily_seed", REPO_ROOT / "scripts" / "news" / "run_daily.py"
@@ -115,11 +142,13 @@ def test_cli_live_seed_prints_counts_only_and_respects_idempotency(
     assert "status: ok" in first and "labelled: 4" in first
     assert "status: done" in second and "--force" in second
     assert len(pipeline.dates) == 2
+    assert script.main(["--live", "--seed", "--rebuild-today"]) == 0
+    assert "status: ok" in capsys.readouterr().out and len(pipeline.dates) == 3
 
 
 def test_cli_seed_needs_live_and_excludes_dry_run() -> None:
     script = _load_run_daily_script()
 
-    for argv in (["--seed"], ["--dry-run", "--live", "--seed"]):
+    for argv in (["--seed"], ["--dry-run", "--live", "--seed"], ["--rebuild-today"]):
         with pytest.raises(SystemExit):
             script.main(argv)
