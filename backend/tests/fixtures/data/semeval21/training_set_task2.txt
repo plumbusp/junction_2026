@@ -1,0 +1,54 @@
+[
+  {
+    "id": "t1",
+    "text": "Officials call the plan a total disaster",
+    "labels": [
+      {
+        "start": 26,
+        "end": 40,
+        "technique": "Loaded Language",
+        "text_fragment": "total disaster"
+      }
+    ]
+  },
+  {
+    "id": "t2",
+    "text": "City council meets on Tuesday to discuss parking",
+    "labels": []
+  },
+  {
+    "id": "t3",
+    "text": "Rain expected tomorrow, experts say it could be worse",
+    "labels": [
+      {
+        "start": 24,
+        "end": 35,
+        "technique": "Appeal to authority",
+        "text_fragment": "experts say"
+      },
+      {
+        "start": 36,
+        "end": 53,
+        "technique": "Doubt",
+        "text_fragment": "it could be worse"
+      }
+    ]
+  },
+  {
+    "id": "t4",
+    "text": "Wave the flag for our team",
+    "labels": [
+      {
+        "start": 0,
+        "end": 13,
+        "technique": "Flag-waving",
+        "text_fragment": "Wave the flag"
+      }
+    ]
+  },
+  {
+    "id": "t5",
+    "text": "The library opens a new reading room",
+    "labels": []
+  }
+]

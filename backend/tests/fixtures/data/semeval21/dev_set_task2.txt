@@ -1,0 +1,31 @@
+[
+  {
+    "id": "d1",
+    "text": "City council meets on Tuesday, to discuss parking!",
+    "labels": []
+  },
+  {
+    "id": "d2",
+    "text": "Some say the bridge is not safe at all",
+    "labels": [
+      {
+        "start": 0,
+        "end": 8,
+        "technique": "Slogans",
+        "text_fragment": "Some say"
+      },
+      {
+        "start": 23,
+        "end": 38,
+        "technique": "Doubt",
+        "text_fragment": "not safe at all"
+      },
+      {
+        "start": 23,
+        "end": 38,
+        "technique": "Doubt",
+        "text_fragment": "not safe at all"
+      }
+    ]
+  }
+]

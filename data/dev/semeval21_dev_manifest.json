@@ -1,0 +1,70 @@
+{
+  "source": "semeval21",
+  "upstream": "SemEval-2021 Task 6, subtask 2",
+  "upstream_url": "https://github.com/di-dimitrov/SEMEVAL-2021-task6-corpus",
+  "licence": "free for general research use",
+  "mapping": "docs/KNOWLEDGE_BASE.md, section 3, 'SemEval-2021 Task 6 mapping'",
+  "generator": "scripts/data/semeval21_convert.py",
+  "seed": 20211,
+  "date": "2026-11-14",
+  "upstream_split": "train+dev",
+  "inputs": {
+    "train": {
+      "file": "training_set_task2.txt",
+      "sha256": "227bf7dd613347fe3d0e4c9f6afa616a918e6d182fccd9e6f7a7bdffef421243"
+    },
+    "dev": {
+      "file": "dev_set_task2.txt",
+      "sha256": "7ec95f275ac73a3fac12f4158b4594db0b57d8679ae1ab6e82c689107fedbc7b"
+    }
+  },
+  "n_upstream": 751,
+  "counts_per_technique": {
+    "semeval21_dev.jsonl": {
+      "loaded_language": 312,
+      "appeal_to_fear": 9,
+      "exaggeration_minimization": 18,
+      "doubt": 18,
+      "vague_authority": 5,
+      "changing_subject": 9,
+      "no_technique": 156
+    },
+    "fewshot.jsonl": {
+      "loaded_language": 2,
+      "appeal_to_fear": 2,
+      "exaggeration_minimization": 2,
+      "doubt": 2,
+      "vague_authority": 2,
+      "changing_subject": 2,
+      "no_technique": 2
+    }
+  },
+  "multi_technique_rows": 142,
+  "excluded_by_reason": {
+    "duplicate_text_in_split": 2,
+    "out_of_taxonomy_only": 79,
+    "overlaps_upstream_test": 1
+  },
+  "fewshot_missing_techniques": [],
+  "spans": {
+    "mapped_label_spans": 1206,
+    "repaired_from_text_fragment": 0,
+    "dropped_not_in_text": 0,
+    "dropped_in_ids": [],
+    "out_of_taxonomy_spans_not_in_text": 1
+  },
+  "files": {
+    "semeval21_dev.jsonl": {
+      "sha256": "10f437c61cd2dc20bdbb1ec3b0038218baec5ebafc1de1115fef6f3e853331f1",
+      "n": 527
+    },
+    "semeval21_dev_multi.jsonl": {
+      "sha256": "3d2b141c5d8696f7b1170fc712dcbba03466c07d4865a32a5ee12e0f980768aa",
+      "n": 142
+    },
+    "fewshot.jsonl": {
+      "sha256": "5c6667205d51269de2563c8a67d67ae339d5b4cc1923fa9a11730dac320c0109",
+      "n": 14
+    }
+  }
+}

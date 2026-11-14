@@ -1,0 +1,67 @@
+[
+  {
+    "id": "s1",
+    "text": "The library opens a new reading room",
+    "labels": []
+  },
+  {
+    "id": "s2",
+    "text": "A huge scandal shakes the town hall",
+    "labels": [
+      {
+        "start": 7,
+        "end": 14,
+        "technique": "Name calling/Labeling",
+        "text_fragment": "scandal"
+      },
+      {
+        "start": 10,
+        "end": 22,
+        "technique": "Loaded Language",
+        "text_fragment": "huge scandal"
+      }
+    ]
+  },
+  {
+    "id": "s3",
+    "text": "Prices rise slightly this week",
+    "labels": [
+      {
+        "start": 12,
+        "end": 18,
+        "technique": "Exaggeration/Minimisation",
+        "text_fragment": "barely"
+      }
+    ]
+  },
+  {
+    "id": "s4",
+    "text": "Whatever the critics say, the storm will ruin everything",
+    "labels": [
+      {
+        "start": 0,
+        "end": 24,
+        "technique": "Whataboutism",
+        "text_fragment": "Whatever the critics say"
+      },
+      {
+        "start": 26,
+        "end": 56,
+        "technique": "Appeal to fear/prejudice",
+        "text_fragment": "the storm will ruin everything"
+      }
+    ]
+  },
+  {
+    "id": "s5",
+    "text": "Vote yes for a brighter tomorrow",
+    "labels": [
+      {
+        "start": 0,
+        "end": 8,
+        "technique": "Slogans",
+        "text_fragment": "Vote yes"
+      }
+    ]
+  }
+]

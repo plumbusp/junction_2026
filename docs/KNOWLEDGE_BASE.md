@@ -57,7 +57,7 @@ PTC techniques outside our six (Flag-Waving, Slogans, Repetition and others) are
 | `doubt` | Doubt |
 | `vague_authority` | Appeal to authority |
 | `changing_subject` | Whataboutism, Misrepresentation of Someone's Position (Straw Man), Presenting Irrelevant Data (Red Herring) |
-| out of taxonomy | Smears, Slogans, Glittering generalities (Virtue), Flag-waving, Causal Oversimplification, Repetition, Thought-terminating cliché, Black-and-white Fallacy/Dictatorship, Reductio ad hitlerum, Obfuscation/Intentional vagueness/Confusion, Bandwagon |
+| out of taxonomy | Smears, Slogans, Glittering generalities (Virtue), Flag-waving, Causal Oversimplification, Repetition, Thought-terminating cliché, Black-and-white Fallacy/Dictatorship, Reductio ad hitlerum, "Obfuscation, Intentional vagueness, Confusion", Bandwagon |
 
 Labelling rules for a meme text (texts are multi-label):
 - no labels at all: `no_technique`;
@@ -65,7 +65,7 @@ Labelling rules for a meme text (texts are multi-label):
 - two or more of our techniques: excluded from evaluation (a single reference label would be arbitrary); allowed in dev;
 - only out-of-taxonomy labels: excluded everywhere, not relabelled as `no_technique`.
 
-Counts on the upstream test split (n=200): 41 no technique, 94 single technique (76 of them `loaded_language`), 48 multi-technique, 17 out of taxonomy only. Rare techniques have n of 1 to 4 in test; their per-technique numbers are reported with that caveat, not hidden. Meme texts are a domain shift from news headlines; state it under "Known limitations".
+Counts on the upstream test split (n=200): 41 no technique, 94 single technique (68 `loaded_language`, 10 `doubt`, 8 `exaggeration_minimization`, 4 `changing_subject`, 2 `appeal_to_fear`, 2 `vague_authority`), 48 multi-technique, 17 out of taxonomy only. Rare techniques have n of 2 to 10 in test; their per-technique numbers are reported with that caveat, not hidden. Meme texts are a domain shift from news headlines; state it under "Known limitations".
 
 ## 4. Review comments (the team's slide)
 
