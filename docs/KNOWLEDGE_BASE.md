@@ -1,82 +1,82 @@
-# База знаний: Spot the Spin
+# Knowledge base: Spot the Spin
 
-Written for: команда и новые участники проекта.
+Written for: the team and new project members.
 
-## 1. Задача хакатона (Junction 2026, челлендж Hostinger)
+## 1. The hackathon challenge (Junction 2026, Hostinger challenge)
 
-Нужно построить AI-инструмент, который находит пропаганду, ботов или недобросовестных участников в сети. Он должен работать **в проде на Hostinger, с публичным URL**, который судьи открывают сами.
+Build an AI-powered tool that detects propaganda, bots or bad actors online. It must run **in production on Hostinger, with a public URL** that the judges open themselves.
 
-Судьи смотрят в первую очередь на:
-- честность и измеримость детекции: precision, false-positive rate, как обрабатываются ложные срабатывания;
-- живой деплой на инфраструктуре Hostinger;
-- прозрачность вердикта.
+The judges look first at:
+- honesty and measurability of detection: precision, false-positive rate, how false positives are handled;
+- live deployment on Hostinger's infrastructure;
+- transparency of the verdict.
 
-Полированный фронтенд вторичен.
+A polished front end is secondary.
 
-Направления из брифа: spot the swarm, **name the technique** (наше), clean the traffic, trust the source. Можно комбинировать.
+Directions from the brief: spot the swarm, **name the technique** (ours), clean the traffic, trust the source. Directions can be combined.
 
-Ресурсы из брифа:
+Resources from the brief:
 - Hostinger connector: docs.hostinger.com/hostinger-connector
 - API: developers.hostinger.com
-- Open-source MCP-сервер: github.com/hostinger/api-mcp-server
-- Наставники на стенде Hostinger и help-канал на выходные (ссылка выдана на kick-off).
+- Open-source MCP server: github.com/hostinger/api-mcp-server
+- Mentors at the Hostinger booth and a help channel for the weekend (link given at kick-off).
 
-## 2. Наш продукт
+## 2. Our product
 
-**Spot the Spin** — ежедневная игра, которая учит видеть манипуляции в новостях, и инструмент, который тот же классификатор использует для анализа текстов.
+**Spot the Spin** is a daily game that teaches people to see manipulation in the news, plus a tool in which the same classifier analyses texts.
 
-- Раунд: три заголовка об одном событии. Игрок выбирает технику или «no technique», отмечает слова-доказательства, видит эталонный ответ, баллы и уверенность системы, может оспорить ответ.
-- Режим Analyze: вставляешь текст или URL, получаешь подсвеченные фразы, технику и объяснение.
-- Страница /metrics: P/R/F1 по техникам, FPR на «no technique», confusion matrix, калибровка согласия моделей.
+- Round: three headlines about one event. The player picks a technique or "no technique", marks evidence words, sees the reference answer, score and system confidence, and can dispute the answer.
+- Analyze mode: paste text or a URL, get highlighted phrases, the technique and an explanation.
+- /metrics page: P/R/F1 per technique, FPR on "no technique", confusion matrix, model-agreement calibration.
 
-Подробнее: `docs/PLAN.md`, контракт ядра: `docs/ARCHITECTURE.md`.
+More: `docs/PLAN.md`; core contract: `docs/ARCHITECTURE.md`.
 
-## 3. Техники манипуляции
+## 3. Manipulation techniques
 
-Шесть техник из презентации команды, плюс «no technique». Это наша таксономия, не SemEval.
+Six techniques from the team's presentation, plus "no technique". This is our own taxonomy, not SemEval's.
 
-| Техника (id) | Что это | Метки PTC (SemEval-2020 T11) |
+| Technique (id) | What it is | PTC labels (SemEval-2020 T11) |
 |---|---|---|
-| Loaded language and labels (`loaded_language`) | эмоционально заряженные слова и ярлыки | Loaded_Language, Name_Calling, Labeling |
-| Appeal to fear (`appeal_to_fear`) | давление через страх | Appeal_to_fear-prejudice |
-| Exaggeration or minimization (`exaggeration_minimization`) | преувеличение или преуменьшение | Exaggeration, Minimisation |
-| Doubt (`doubt`) | намёки на сомнение без доказательств | Doubt |
-| Vague authority (`vague_authority`) | ссылка на безымянных «экспертов» | Appeal_to_Authority |
-| Changing the subject (`changing_subject`) | уход от вопроса | Whataboutism, Straw_Men, Red_Herring |
-| No technique (`no_technique`) | обычная информация, манипуляции нет | — |
+| Loaded language and labels (`loaded_language`) | emotionally charged words and labels | Loaded_Language, Name_Calling, Labeling |
+| Appeal to fear (`appeal_to_fear`) | pressure through fear | Appeal_to_fear-prejudice |
+| Exaggeration or minimization (`exaggeration_minimization`) | overstating or understating | Exaggeration, Minimisation |
+| Doubt (`doubt`) | hints of doubt without evidence | Doubt |
+| Vague authority (`vague_authority`) | reference to unnamed "experts" | Appeal_to_Authority |
+| Changing the subject (`changing_subject`) | deflection from the question | Whataboutism, Straw_Men, Red_Herring |
+| No technique (`no_technique`) | ordinary information, no manipulation | — |
 
-Техники PTC вне нашей шестёрки (Flag-Waving, Slogans, Repetition и др.) при оценке **исключаются**, а не помечаются как «no technique».
+PTC techniques outside our six (Flag-Waving, Slogans, Repetition and others) are **excluded** from evaluation, not labelled as "no technique".
 
-## 4. Замечания ревью (картинка команды)
+## 4. Review comments (the team's slide)
 
-1. Нет страницы /metrics. Это ~40% оценки, главный приоритет.
-2. «Три прогона одной модели» — слабый сигнал. Нужны три разные модели через AI Router.
-3. Игра пока не инструмент. Нужен режим Analyze.
-4. Заголовки в презентации выдуманы. В игре нужны реальные новости дня.
-5. Споры игроков не используются. Нужен цикл спора, и спорные случаи идут только в dev.
-6. На слайдах 2 и 7 обрезан текст справа. Формулу 40 × F1 (как 27 на слайде 5) нужно вынести на слайд.
+1. There is no /metrics page. It is about 40% of the score and the top priority.
+2. "Three runs of one model" is a weak signal. Use three different models through AI Router.
+3. The game is not yet a tool. An Analyze mode is needed.
+4. The headlines in the presentation are invented. The game needs real news of the day.
+5. Player disputes are unused. A dispute loop is needed, and disputed cases go only into dev.
+6. Slides 2 and 7 have text cut off on the right. The 40 × F1 formula (the 27 on slide 5) should be put on a slide.
 
-## 5. Датасеты
+## 5. Datasets
 
-| Источник | Что | Статус |
+| Source | What | Status |
 |---|---|---|
-| PTC, SemEval-2020 Task 11 | новостные статьи, разметка по спанам, 14 техник | нужна регистрация: propaganda.qcri.org/ptc/registration.php. Статус не подтверждён |
-| SemEval-2023 Task 3 (subtask 3) | абзацы новостей, английский, ~19 техник | регистрация открыта. Статус не подтверждён |
-| SemEval-2021 Task 6 | тексты мемов, 22 техники | доступность не проверена |
-| Свой gold-set реальных заголовков | 150–200 заголовков из RSS, два разметчика | **не создан**. В репо данных `data/` пока нет |
+| PTC, SemEval-2020 Task 11 | news articles, span-level labels, 14 techniques | registration required: propaganda.qcri.org/ptc/registration.php. Status not confirmed |
+| SemEval-2023 Task 3 (subtask 3) | English news paragraphs, ~19 techniques | registration open. Status not confirmed |
+| SemEval-2021 Task 6 | meme texts, 22 techniques | availability not verified |
+| Own gold set of real headlines | 150–200 headlines from RSS, labelled by two people | **not created**. The repository has no `data/` yet |
 
-Важно: в репо пока нет `data/eval/`. Замороженного тест-набора не существует, его нужно создать и заморозить до подбора промптов.
+Important: the repository has no `data/eval/` yet. There is no frozen test set; it has to be created and frozen before prompt tuning.
 
-## 6. Ключевые решения
+## 6. Key decisions
 
-- Ансамбль из трёх разных моделей через Hostinger AI Router. Уверенность = доля согласившихся моделей, а не вероятность.
-- Один классификатор для игры, Analyze и /metrics.
-- Тест-набор замораживается до тюнинга промпта. Dev и test не пересекаются.
-- Прежде всего точность и измеримость. Если что-то не успеваем, сначала режем споры, потом RSS.
+- An ensemble of three different models through Hostinger AI Router. Confidence = share of agreeing models, not a probability.
+- One classifier for the game, Analyze and /metrics.
+- The test set is frozen before prompt tuning. Dev and test do not overlap.
+- Accuracy and measurability come first. If time runs short, cut disputes first, then RSS.
 
-## 7. Открытые вопросы
+## 7. Open questions
 
-- Подтвердить регистрацию на PTC и статус SemEval-2023.
-- Найти второго разметчика для gold-set.
-- Уточнить у Hostinger базовый URL AI Router (в панели) и список доступных моделей.
-- Решить, нужен ли Hostinger AI Builder для фронтенда или пишем сами.
+- Confirm the PTC registration and the status of SemEval-2023.
+- Find a second annotator for the gold set.
+- Confirm the AI Router base URL in the panel, and the list of available models (done: the list was retrieved and three models were verified).
+- Decide whether Hostinger AI Builder is used for the frontend or the frontend is written by hand.

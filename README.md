@@ -1,380 +1,384 @@
 # Spot the Spin — junction_2026
 
-Проект для хакатона **Junction 2026**, челлендж **Hostinger**: «построй AI-инструмент, который находит пропаганду, ботов и недобросовестных участников, и разверни его публично на инфраструктуре Hostinger».
+Project for the **Junction 2026** hackathon, **Hostinger** challenge: "Build an AI-powered tool that detects propaganda, bots and bad actors online, and deploy it live on Hostinger's infrastructure."
 
-Наше направление — **Name the technique**: классификатор техник манипуляции в новостных заголовках, который объясняет вердикт простым языком. Вокруг него построена игра **Spot the Spin**: игрок учится видеть манипуляции, а эталонный ответ, баллы и уверенность системы показываются на каждом шаге.
+Our direction is **Name the technique**: a classifier that finds manipulation techniques in news headlines and explains each verdict in plain language. Around it we build the game **Spot the Spin**, where players learn to see manipulation, and the correct answer, score and system confidence are shown at every step.
 
-> **Статус.** Актуальное состояние — в [docs/STATUS.md](docs/STATUS.md). Коротко: инфраструктура (этап 0) готова, VPS настроен, тестовый hello-world работает по HTTPS. Код приложения ещё не написан: его собирают агенты из `.claude/agents/` под управлением оркестратора.
-
----
-
-## Содержание
-
-1. [Что мы строим](#1-что-мы-строим)
-2. [Критерии жюри и что из них следует](#2-критерии-жюри-и-что-из-них-следует)
-3. [Продукт](#3-продукт)
-4. [Шесть техник манипуляции](#4-шесть-техник-манипуляции)
-5. [Архитектура](#5-архитектура)
-6. [Структура репозитория](#6-структура-репозитория)
-7. [Этапы плана и статус](#7-этапы-плана-и-статус)
-8. [Данные и честность метрик](#8-данные-и-честность-метрик)
-9. [Локальный запуск](#9-локальный-запуск)
-10. [Тесты и оценка](#10-тесты-и-оценка)
-11. [Деплой на Hostinger](#11-деплой-на-hostinger)
-12. [Переменные окружения](#12-переменные-окружения)
-13. [Агенты и скиллы](#13-агенты-и-скиллы)
-14. [Как оркестратор собирает приложение](#14-как-оркестратор-собирает-приложение)
-15. [Git и правила работы](#15-git-и-правила-работы)
-16. [Документация проекта](#16-документация-проекта)
-17. [Частые проблемы](#17-частые-проблемы)
-18. [Лицензия](#18-лицензия)
+> **Status.** The current state lives in [docs/STATUS.md](docs/STATUS.md). In short: infrastructure (stage 0) is ready, the VPS is configured, and a test hello-world runs over HTTPS. The application code is not written yet; agents from `.claude/agents/`, orchestrated by the repo-orchestrator skill, will build it.
 
 ---
 
-## 1. Что мы строим
+## Contents
 
-Три связанные части, которые используют **одно ядро** (классификатор):
+1. [What we are building](#1-what-we-are-building)
+2. [Jury criteria and what follows from them](#2-jury-criteria-and-what-follows-from-them)
+3. [Product](#3-product)
+4. [Six manipulation techniques](#4-six-manipulation-techniques)
+5. [Architecture](#5-architecture)
+6. [Repository layout](#6-repository-layout)
+7. [Plan stages and status](#7-plan-stages-and-status)
+8. [Data and metric honesty](#8-data-and-metric-honesty)
+9. [Local setup](#9-local-setup)
+10. [Tests and evaluation](#10-tests-and-evaluation)
+11. [Deployment on Hostinger](#11-deployment-on-hostinger)
+12. [Environment variables](#12-environment-variables)
+13. [Agents and skills](#13-agents-and-skills)
+14. [How the orchestrator builds the application](#14-how-the-orchestrator-builds-the-application)
+15. [Git and working rules](#15-git-and-working-rules)
+16. [Project documentation](#16-project-documentation)
+17. [Common problems](#17-common-problems)
+18. [License](#18-license)
 
-| Часть | Что делает | Для кого |
+---
+
+## 1. What we are building
+
+Three related parts that share **one core** (the classifier):
+
+| Part | What it does | Audience |
 |---|---|---|
-| **Игра Spot the Spin** | раунд из трёх заголовков об одном событии: игрок выбирает технику, отмечает слова-доказательства, видит эталон, баллы и уверенность системы, может оспорить ответ | игроки, демо для жюри |
-| **Analyze** | вставляешь текст или URL, получаешь подсвеченные фрагменты, технику и объяснение простым языком | любой пользователь, публичный API |
-| **/metrics** | точность, полнота, F1 по каждой технике, частота ложных срабатываний на «no technique», матрица ошибок, калибровка уверенности, размеры выборок и интервалы | жюри: доказательство честности |
+| **Spot the Spin game** | a round of three headlines about one event: the player picks a technique, marks evidence words, sees the reference answer, score and system confidence, and can dispute the answer | players, jury demo |
+| **Analyze** | paste text or a URL, get highlighted fragments, the technique and a plain-language explanation | any user, public API |
+| **/metrics** | precision, recall, F1 per technique, false-positive rate on "no technique", confusion matrix, confidence calibration, sample sizes and intervals | jury: proof of honesty |
 
-Плюс два вспомогательных источника: **реальные новости дня** (RSS нескольких изданий с разной позицией, группировка по событию) и **цикл споров** (игрок не согласен с моделью — спор проходит проверку и только потом попадает в данные).
+Plus two supporting sources: **real news of the day** (RSS from several outlets with different leanings, grouped by event) and a **dispute loop** (a player disagrees with the model; the dispute is reviewed before it touches any data).
 
-Почему так: жюри ставит приоритет **честной и измеримой детекции** (precision, false-positive rate, обработка ложных срабатываний), а не полировке интерфейса. Поэтому один классификатор питает все три части, и метрики считаются на замороженном тестовом наборе, которого не видели при подборе промптов.
-
----
-
-## 2. Критерии жюри и что из них следует
-
-Из брифа челленджа:
-
-- Инструмент **должен работать на Hostinger** и быть доступен по публичному URL, который судьи открывают сами.
-- Судьи ценят **силу и честность логики детекции**, включая обработку ложных срабатываний.
-- Особенно интересны подходы, которые **прозрачны и измеримы**: показывайте precision и false-positive rate, а не только демо на удачных примерах.
-- Доступны ресурсы: VPS KVM 2, AI Router с 150+ моделями и одним ключом, OpenAI- и Anthropic-совместимый API.
-
-Из этого следуют наши правила:
-
-1. Сначала живой деплой (этап 0), потом всё остальное. «Публичный URL» не откладываем на последнюю ночь.
-2. Метрики — отдельная страница с размерами выборок и интервалами. Без неё главный аргумент пропадает.
-3. Три разные модели вместо трёх прогонов одной: уверенность = доля согласившихся моделей.
-4. Всё, что нельзя честно измерить, помечаем как ограничение, а не прячем.
-
-Ресурсы Hostinger из брифа: [docs.hostinger.com/hostinger-connector](https://docs.hostinger.com/hostinger-connector), [developers.hostinger.com](https://developers.hostinger.com), [github.com/hostinger/api-mcp-server](https://github.com/hostinger/api-mcp-server).
+Why: the jury prioritises **honest, measurable detection** (precision, false-positive rate, handling of false positives) over interface polish. So one classifier powers all three parts, and metrics are computed on a frozen test set that was never used for prompt tuning.
 
 ---
 
-## 3. Продукт
+## 2. Jury criteria and what follows from them
 
-### 3.1 Игра — пять шагов раунда
+From the challenge brief:
 
-1. **Заголовки.** Три заголовка об одном событии. Один из них обычно «чистый» (без техники), чтобы игрок не видел манипуляции везде.
-2. **Техника.** Игрок выбирает одну из шести техник или «no technique» для каждого заголовка.
-3. **Доказательства.** Игрок кликает слова, которые подтверждают его выбор.
-4. **Ответ.** Показываются эталонная техника, эталонные слова, баллы и уверенность системы (например, «3 из 3» или «спорный случай»).
-5. **Спор.** Если игрок не согласен, он выбирает свой вариант и отправляет спор на проверку.
+- The tool **must run on Hostinger** and be reachable at a public URL that the judges open themselves.
+- Judges value **the strength and honesty of the detection logic**, including how false positives are handled.
+- Approaches that are **transparent and measurable** are especially interesting: show precision and false-positive rate, not just a demo on happy-path examples.
+- Resources available: VPS KVM 2, AI Router with 150+ models behind one key, OpenAI- and Anthropic-compatible API.
 
-### 3.2 Баллы
+Rules we derive from this:
 
-Для каждого заголовка:
+1. Live deployment first (stage 0), then everything else. The public URL is not left to the last night.
+2. Metrics are a separate page with sample sizes and intervals. Without it, the main argument disappears.
+3. Three different models instead of three runs of one model: confidence = share of agreeing models.
+4. Anything that cannot be measured honestly is listed as a limitation, not hidden.
 
-- **Техника** — 60 баллов, если совпала с эталоном, иначе 0. Баллы за технику не зависят от слов.
-- **Слова-доказательства** — `40 × token-F1` между словами игрока и эталоном. Округление до целого, половина вверх. Слова считаются независимо от выбора техники.
-- **Особый случай:** эталон «no technique» и игрок не выбрал ни одного слова — полные 40 баллов.
+Hostinger resources from the brief: [docs.hostinger.com/hostinger-connector](https://docs.hostinger.com/hostinger-connector), [developers.hostinger.com](https://developers.hostinger.com), [github.com/hostinger/api-mcp-server](https://github.com/hostinger/api-mcp-server).
 
-Итог раунда — среднее трёх заголовков, округлённое до целого.
+---
 
-Пример из презентации команды: A = 60 + 27 = **87**; B = 0 + 27 = **27**; C = 60 + 40 = **100**; раунд = round((87 + 27 + 100) / 3) = **71**. Здесь 27 = 40 × 0.667, где игрок выбрал «slams», а эталон — «slams» и «rip-off» (P = 1, R = 0.5).
+## 3. Product
 
-Этот пример зашит в тесты и не должен меняться.
+### 3.1 Game: the five steps of a round
 
-### 3.3 Уверенность системы
+1. **Headlines.** Three headlines about one event. Usually one of them is "clean" (no technique), so players do not see manipulation everywhere.
+2. **Technique.** For each headline the player picks one of six techniques or "no technique".
+3. **Evidence.** The player clicks the words that support the choice.
+4. **Answer.** The reference technique, the reference words, the score and the system confidence are shown (for example "3 of 3" or "disputed case").
+5. **Dispute.** If the player disagrees, they pick their own option and send the dispute for review.
 
-Система запускает три разные модели. Уверенность — это **доля согласившихся моделей**, а не вероятность. Поэтому показываем «3 из 3» или «2 из 3», а не «100% верно». Если согласия нет, заголовок помечается как **спорный** и не подаётся как уверенный вердикт.
+### 3.2 Scoring
+
+For each headline:
+
+- **Technique**: 60 points if it matches the reference, otherwise 0. Technique points do not depend on the words.
+- **Evidence words**: `40 × token-F1` between the player's words and the reference words. Rounded to the nearest integer, halves up. Evidence is scored independently of the technique choice.
+- **Special case:** the reference is "no technique" and the player selected no words: full 40 points.
+
+Round total: the mean of the three headlines, rounded to the nearest integer.
+
+Example from the team's presentation: A = 60 + 27 = **87**; B = 0 + 27 = **27**; C = 60 + 40 = **100**; round = round((87 + 27 + 100) / 3) = **71**. Here 27 = 40 × 0.667, where the player chose "slams" and the reference is "slams" and "rip-off" (P = 1, R = 0.5).
+
+This example is encoded in the tests and must not change.
+
+### 3.3 System confidence
+
+The system runs three different models. Confidence is the **share of agreeing models**, not a probability. That is why we show "3 of 3" or "2 of 3", never "100% correct". When there is no agreement, the headline is marked as **disputed** and is not presented as a confident verdict.
 
 ### 3.4 Analyze
 
-Вход: текст или URL (только `https`, адреса во внутренних сетях запрещены, размер ограничен). Выход: техника, подсвеченные фрагменты с позициями в тексте, объяснение, согласие моделей и флаг `disputed`. Запросы ограничены по частоте с одного IP.
+Input: text or a URL (only `https`; internal network addresses are refused; size is capped). Output: the technique, highlighted fragments with positions in the text, the explanation, model agreement and the `disputed` flag. Requests are rate-limited per IP.
 
 ### 3.5 /metrics
 
-Страница читает результаты последнего **реального** прогона на замороженном тестовом наборе. Показывает:
+The page reads the results of the last **real** run on the frozen test set. It shows:
 
-- n по каждому источнику и по каждой технике;
-- precision, recall, F1 по технике и macro-F1;
-- **FPR на «no technique»** с интервалом Wilson 95%;
-- матрицу ошибок;
-- качество слов-доказательств (token-F1);
-- точность по уровням согласия (3 из 3, 2 из 3, спорные);
-- результаты каждой модели отдельно и ансамбля;
-- каппа Коэна между двумя разметчиками (потолок человеческого согласия).
+- n per source and per technique;
+- precision, recall, F1 per technique, and macro-F1;
+- **FPR on "no technique"** with a 95% Wilson interval;
+- the confusion matrix;
+- quality of the evidence words (token-F1);
+- accuracy by agreement level (3 of 3, 2 of 3, disputed);
+- results of each model separately and of the ensemble;
+- Cohen's kappa between two annotators (the human agreement ceiling).
 
-Если результаты получены в режиме заглушки, страница показывает предупреждение. Ничего не маскируется.
+If the results come from stub mode, the page shows a warning. Nothing is hidden.
 
-### 3.6 Новости дня и споры
+### 3.6 News of the day and disputes
 
-- **Новости.** RSS из 8–15 английских изданий с разной позицией. Заголовки группируются по событию в окне 48 часов; кластер попадает в раунд, только если в нём не меньше трёх изданий. Кандидаты сначала идут на разметку, а не сразу в игру.
-- **Споры.** Путь: `queued → in_review → rescored`. Один голос ничего не меняет: спор уходит на проверку при N независимых спорах по одному случаю. Спорные случаи попадают только в **dev**-набор и никогда в тестовый.
+- **News.** RSS from 8–15 English-language outlets with different leanings. Headlines are grouped by event within a 48-hour window; a cluster becomes a round only if it contains at least three outlets. Candidates go to labelling first, not straight into the game.
+- **Disputes.** Flow: `queued → in_review → rescored`. One vote changes nothing: a dispute goes to review after N independent disputes of the same case. Disputed cases go only into the **dev** set, never into the test set.
 
 ---
 
-## 4. Шесть техник манипуляции
+## 4. Six manipulation techniques
 
-Наша таксономия (из презентации команды) и соответствие меткам корпуса PTC (SemEval-2020 Task 11):
+Our taxonomy (from the team's presentation) and its mapping to the PTC corpus labels (SemEval-2020 Task 11):
 
-| Техника (id) | Что это | Метки PTC |
+| Technique (id) | What it is | PTC labels |
 |---|---|---|
-| Loaded language and labels (`loaded_language`) | эмоционально заряженные слова, ярлыки | Loaded_Language, Name_Calling, Labeling |
-| Appeal to fear (`appeal_to_fear`) | давление через страх | Appeal_to_fear-prejudice |
-| Exaggeration or minimization (`exaggeration_minimization`) | преувеличение или преуменьшение | Exaggeration, Minimisation |
-| Doubt (`doubt`) | намёки на сомнение без доказательств | Doubt |
-| Vague authority (`vague_authority`) | ссылка на безымянных «экспертов» | Appeal_to_Authority |
-| Changing the subject (`changing_subject`) | уход от вопроса | Whataboutism, Straw_Men, Red_Herring |
-| No technique (`no_technique`) | обычная информация, манипуляции нет | — |
+| Loaded language and labels (`loaded_language`) | emotionally charged words, labels | Loaded_Language, Name_Calling, Labeling |
+| Appeal to fear (`appeal_to_fear`) | pressure through fear | Appeal_to_fear-prejudice |
+| Exaggeration or minimization (`exaggeration_minimization`) | overstating or understating | Exaggeration, Minimisation |
+| Doubt (`doubt`) | hints of doubt without evidence | Doubt |
+| Vague authority (`vague_authority`) | reference to unnamed "experts" | Appeal_to_Authority |
+| Changing the subject (`changing_subject`) | deflection from the question | Whataboutism, Straw_Men, Red_Herring |
+| No technique (`no_technique`) | ordinary information, no manipulation | — |
 
-Метки PTC вне нашей шестёрки (например, Flag-Waving, Slogans, Repetition) при оценке **исключаются**, а не превращаются в `no_technique`. Иначе модель будет наказана за правильную находку.
+PTC labels outside our six (for example Flag-Waving, Slogans, Repetition) are **excluded** from evaluation, not turned into `no_technique`. Otherwise the model would be penalised for a correct finding.
 
 ---
 
-## 5. Архитектура
+## 5. Architecture
 
 ```
-            ┌────────────────────────── браузер ──────────────────────────┐
-            │  игра  ·  Analyze  ·  /metrics  ·  разметка (offline)        │
+            ┌────────────────────────── browser ──────────────────────────┐
+            │  game  ·  Analyze  ·  /metrics  ·  labelling (offline)       │
             └──────────────┬───────────────────────────────────────────────┘
                            │ HTTPS
                   ┌────────▼────────┐
-                  │ Traefik (Hostinger, уже работает на 80/443, Let's Encrypt)
+                  │ Traefik (Hostinger, already on 80/443, Let's Encrypt)
                   └────────┬────────┘
-                           │ Docker-сеть (порты наружу не публикуются)
+                           │ Docker network (no ports published to the host)
             ┌──────────────▼──────────────────────────────────────────┐
             │  FastAPI  (backend/app)                                  │
             │  api/  ── round · answer · dispute · analyze · metrics   │
             │  game/ ── scoring (60 + 40×F1) · rounds · disputes       │
-            │  news/ ── RSS · кластеры · ежедневный job                 │
-            │  core/ ── ЕДИНСТВЕННЫЙ классификатор ◄── все части         │
-            │  db.py ── SQLite (раунды, ответы, споры)                 │
-            │  security/ ── SSRF-защита, rate limit                    │
+            │  news/ ── RSS · clusters · daily job                     │
+            │  core/ ── THE ONLY classifier ◄── all parts use it       │
+            │  db.py ── SQLite (rounds, answers, disputes)             │
+            │  security/ ── SSRF protection, rate limit                │
             └──────┬───────────────────────────────┬──────────────────┘
-                   │ classify(text) -> Verdict      │ чтение результатов
+                   │ classify(text) -> Verdict      │ reads results
           ┌────────▼─────────┐            ┌────────▼────────┐
           │ Hostinger AI      │            │ backend/eval     │
-          │ Router            │            │ метрики, runner  │
-          │ 3 разные модели   │            │ → results JSON   │
+          │ Router            │            │ metrics, runner  │
+          │ 3 different models│            │ → results JSON   │
           └──────────────────┘            └─────────────────┘
                                                   ▲
-                                 data/eval (ЗАМОРОЖЕН) · data/dev
+                                 data/eval (FROZEN) · data/dev
 ```
 
-### 5.1 Ядро классификатора
+### 5.1 Classifier core
 
-Контракт (подробно в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)):
+Contract (details in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)):
 
 - `classify(text) -> Verdict`
-- `Verdict`: `technique`, `evidence_spans` (точные подстроки входа), `explanation`, `agreement` (0..3), `n_models`, `disputed`, `votes`.
-- Три модели через AI Router, параллельно, таймаут 20 с, один повтор при ошибке. Упавшая модель исключается; если успешных голосов меньше двух, вердикт спорный.
-- Спаны, которых нет в тексте, отбрасываются. Ничего не выдумывается.
-- Кэш по хешу (версия промпта, нормализованный текст, список моделей).
-- Режим `CORE_MODE=stub` даёт детерминированные ответы без ключей. Все тесты и параллельная разработка идут на заглушке.
+- `Verdict`: `technique`, `evidence_spans` (exact substrings of the input), `explanation`, `agreement` (0..3), `n_models`, `disputed`, `votes`.
+- Three models through AI Router, called in parallel, 20 s timeout, one retry on error. A failed model is excluded; if fewer than two successful votes remain, the verdict is disputed.
+- Spans that do not occur in the text are dropped. Nothing is invented.
+- Cache keyed by a hash of (prompt version, normalised text, model list).
+- `CORE_MODE=stub` returns deterministic answers without keys. All tests and parallel development run on the stub.
 
-### 5.2 Стек
+### 5.2 Stack
 
-| Слой | Инструмент | Статус |
+| Layer | Tool | Status |
 |---|---|---|
-| Сервер | Hostinger VPS KVM 2, Ubuntu 24.04 | настроен |
-| Прокси и HTTPS | Traefik (уже на сервере, Let's Encrypt) | работает |
-| Контейнеры | Docker 29, Compose | работает |
-| Backend | Python 3.12, FastAPI, uvicorn, httpx, Pydantic | план |
-| Хранение | SQLite | план |
-| Модели | Hostinger AI Router (`https://router.hostinger.com/v1`) | ключ получен |
-| Тесты | pytest | план |
-| Пакеты | uv | нужен |
-| Фронтенд | HTML, CSS, JavaScript без сборки | план |
-| Новости | feedparser, TF-IDF | план |
-| Извлечение текста из URL | trafilatura | план |
+| Server | Hostinger VPS KVM 2, Ubuntu 24.04 | configured |
+| Proxy and HTTPS | Traefik (already on the server, Let's Encrypt) | running |
+| Containers | Docker 29, Compose | running |
+| Backend | Python 3.12, FastAPI, uvicorn, httpx, Pydantic | planned |
+| Storage | SQLite | planned |
+| Models | Hostinger AI Router (`https://router.hostinger.com/v1`) | key received |
+| Tests | pytest | planned |
+| Packages | uv | required |
+| Frontend | HTML, CSS, JavaScript without a build step | planned |
+| News | feedparser, TF-IDF | planned |
+| Text extraction from URLs | trafilatura | planned |
 
-Подробнее: [docs/TOOLS.md](docs/TOOLS.md).
+Details: [docs/TOOLS.md](docs/TOOLS.md).
 
 ---
 
-## 6. Структура репозитория
+## 6. Repository layout
 
-Пометки: ✅ уже есть, 🔜 создаст агент.
+Legend: ✅ exists, 🔜 will be created by an agent.
 
 ```
 junction_2026/
 ├── .claude/
-│   ├── agents/                  🔜 низкоуровневые агенты сборки (раздел 13)
+│   ├── agents/                  🔜 low-level build agents (section 13)
 │   └── skills/
-│       ├── repo-orchestrator/   ✅ оркестратор проекта
-│       ├── write-tests/         ✅ тесты после реализации
-│       └── run-app/             ✅ запуск и smoke-проверка
+│       ├── repo-orchestrator/   ✅ project orchestrator
+│       ├── write-tests/         ✅ tests after implementation
+│       └── run-app/             ✅ run and smoke check
 ├── backend/
 │   ├── app/
-│   │   ├── config.py            🔜 настройки из .env (ключ не печатается)
-│   │   ├── main.py              🔜 приложение FastAPI
+│   │   ├── config.py            🔜 settings from .env (key is never printed)
+│   │   ├── main.py              🔜 FastAPI application
 │   │   ├── db.py                🔜 SQLite
-│   │   ├── core/                🔜 ЕДИНСТВЕННЫЙ классификатор
-│   │   ├── game/                🔜 скоринг, раунды, споры
-│   │   ├── news/                🔜 RSS, кластеры, ежедневный job
-│   │   ├── api/                 🔜 эндпоинты
+│   │   ├── core/                🔜 THE ONLY classifier
+│   │   ├── game/                🔜 scoring, rounds, disputes
+│   │   ├── news/                🔜 RSS, clusters, daily job
+│   │   ├── api/                 🔜 endpoints
 │   │   └── security/            🔜 SSRF, rate limit
-│   ├── eval/                    🔜 метрики, runner, results/
+│   ├── eval/                    🔜 metrics, runner, results/
 │   └── tests/                   🔜 pytest
-├── frontend/                    🔜 игра, Analyze, /metrics, разметка
-├── data/                        🔜 (см. раздел 8; каталог создаётся агентами)
-│   ├── raw/                     корпуса, НЕ коммитятся
-│   ├── dev/                     few-shot и подбор промптов
-│   ├── eval/                    ЗАМОРОЖЕННЫЙ тестовый набор
-│   ├── news/                    кандидаты из RSS, НЕ коммитятся
-│   └── cache/                   кэш классификатора, НЕ коммитится
-├── scripts/                     🔜 конвертеры, новости
-├── deploy/                      🔜 вспомогательные скрипты (не запускаются сами)
-├── docs/                        ✅ планы, статус, правила, знания, инфраструктура
+├── frontend/                    🔜 game, Analyze, /metrics, labelling
+├── data/                        🔜 (see section 8; created by agents)
+│   ├── raw/                     corpora, NOT committed
+│   ├── dev/                     few-shot examples and prompt tuning
+│   ├── eval/                    FROZEN test set
+│   ├── news/                    RSS candidates, NOT committed
+│   └── cache/                   classifier cache, NOT committed
+├── scripts/                     🔜 converters, news job
+├── deploy/                      🔜 helper scripts (never run automatically)
+├── docs/                        ✅ plans, status, rules, knowledge base, infrastructure
 ├── Dockerfile                   🔜
 ├── docker-compose.yml           🔜
 ├── .dockerignore                ✅
 ├── .gitignore                   ✅
-├── .env.example                 ✅ только имена переменных
-├── .env                         ✅ локально, НЕ в git
+├── .env.example                 ✅ variable names only
+├── .env                         ✅ local, NOT in git
 ├── pyproject.toml               🔜
 ├── LICENSE                      ✅
-└── README.md                    ✅ этот файл
+└── README.md                    ✅ this file
 ```
 
 ---
 
-## 7. Этапы плана и статус
+## 7. Plan stages and status
 
-Полный план — [docs/PLAN.md](docs/PLAN.md). Здесь сжато и с критериями готовности.
+The full plan is in [docs/PLAN.md](docs/PLAN.md). Summary with done-criteria below.
 
-| # | Этап | Статус | Готово, когда |
+| # | Stage | Status | Done when |
 |---|---|---|---|
-| 0 | Инфраструктура и скелет деплоя | в работе | VPS настроен; hello-world по HTTPS; Dockerfile приложения и runbook готовы |
-| 1 | Датасеты и gold-set | не начат | PTC получен и сконвертирован; gold-set из 150–200 реальных заголовков размечен двумя людьми; eval заморожен с манифестом |
-| 2 | Ядро: ансамбль-классификатор | не начат | `classify` работает в live и stub; тесты агрегации и спанов зелёные; модели проверены через `/v1/models` |
-| 3 | Страница /metrics | не начат | eval-runner пишет JSON; страница показывает P/R/F1, FPR, матрицу, интервалы, каппу |
-| 4 | Игра | не начат | пять шагов раунда работают; баллы совпадают с примером 87/27/100/71 |
-| 5 | Режим Analyze и публичный API | не начат | `/api/analyze` возвращает точные спаны; SSRF-защита проверена |
-| 6 | Реальные новости дня | не начат | RSS-кандидаты с кластерами из 3+ изданий; раунд дня собирается |
-| 7 | Споры и человек против модели | не начат | спор проходит все статусы; тестовые метрики не меняются |
-| 8 | Финал | не начат | публичный URL проверен; лимиты включены; демо-сценарий отрепетирован; слайды обновлены |
+| 0 | Infrastructure and deployment skeleton | in progress | VPS configured; hello-world over HTTPS; application Dockerfile and runbook ready |
+| 1 | Datasets and gold set | not started | PTC obtained and converted; gold set of 150–200 real headlines labelled by two people; eval frozen with a manifest |
+| 2 | Core ensemble classifier | not started | `classify` works in live and stub modes; aggregation and span tests green; models verified through `/v1/models` |
+| 3 | /metrics page | not started | eval runner writes JSON; page shows P/R/F1, FPR, matrix, intervals, kappa |
+| 4 | Game | not started | five-step round works; scores match the 87/27/100/71 example |
+| 5 | Analyze mode and public API | not started | `/api/analyze` returns exact spans; SSRF protection verified |
+| 6 | Real news of the day | not started | RSS candidates with clusters of 3+ outlets; round of the day is assembled |
+| 7 | Disputes and human vs model | not started | a dispute passes all statuses; test metrics do not change |
+| 8 | Final | not started | public URL verified; limits enabled; demo script rehearsed; slides updated |
 
-**Порядок отсечения, если не успеваем:** сначала этап 7, потом 6 (оставить заранее собранные раунды). Этапы 0–3 и 5 не режем.
+**Cut order if time runs short:** stage 7 first, then 6 (keep pre-built rounds). Stages 0–3 and 5 are not cut.
 
-**Замечания ревью** (с картинки команды), которые учтены в плане: нет /metrics; три прогона одной модели — слабый сигнал; игра ещё не инструмент; заголовки выдуманы; споры не используются; на слайдах 2 и 7 обрезан текст; формула 27 на слайде 5 не объяснена.
+**Review comments** (from the team's slide) that the plan addresses: no /metrics; three runs of one model are a weak signal; the game is not yet a tool; headlines are invented; disputes are unused; slides 2 and 7 have truncated text; the 27 on slide 5 is not explained.
 
 ---
 
-## 8. Данные и честность метрик
+## 8. Data and metric honesty
 
-### 8.1 Источники
+### 8.1 Sources
 
-| Источник | Что | Статус |
+| Source | What | Status |
 |---|---|---|
-| PTC, SemEval-2020 Task 11 | новостные статьи, разметка по фрагментам, 14 техник | нужна регистрация: propaganda.qcri.org/ptc/registration.php. Пользователь кладёт файлы в `data/raw/ptc/` |
-| SemEval-2023 Task 3, подзадача 3 | абзацы новостей, английский, ~19 техник | регистрация открыта. Второй независимый набор |
-| SemEval-2021 Task 6 | тексты мемов, 22 техники | доступность не проверена |
-| Свой gold-set | 150–200 реальных заголовков из RSS, размечают два человека | не создан |
+| PTC, SemEval-2020 Task 11 | news articles, span-level labels, 14 techniques | registration required: propaganda.qcri.org/ptc/registration.php. The user places files in `data/raw/ptc/` |
+| SemEval-2023 Task 3, subtask 3 | English news paragraphs, ~19 techniques | registration open. Second independent set |
+| SemEval-2021 Task 6 | meme texts, 22 techniques | availability not verified |
+| Own gold set | 150–200 real headlines from RSS, labelled by two people | not created |
 
-Заголовки, сгенерированные LLM, допустимы только как few-shot и для демо. В оценку не попадают никогда.
+Headlines generated by an LLM are allowed only as few-shot examples and for demos. They never enter evaluation.
 
-### 8.2 Правила
+### 8.2 Rules
 
-1. **Тестовый набор заморожен** (`data/eval/eval_vN/` с `manifest.json` и SHA-256). Его не меняют и не используют для few-shot, промптов или порогов. Изменение означает новую версию и решение пользователя.
-2. **Dev и test не пересекаются.** `scripts/data/check_splits.py` проверяет это по нормализованному тексту.
-3. **Споры игроков** идут только в dev и только после проверки.
-4. **Метрики честные:** всегда n, интервалы Wilson, FPR на «no technique», источники не сливаются в одну цифру.
-5. **Сырые корпуса не коммитятся**; перед использованием проверяем лицензию.
+1. **The test set is frozen** (`data/eval/eval_vN/` with `manifest.json` and SHA-256). It is never changed, and never used for few-shot examples, prompts or thresholds. A change means a new version and a decision by the user.
+2. **Dev and test do not overlap.** `scripts/data/check_splits.py` verifies this on normalised text.
+3. **Player disputes** go only into dev, and only after review.
+4. **Honest metrics:** always n, Wilson intervals, FPR on "no technique", sources are never merged into one number.
+5. **Raw corpora are not committed**; licences are checked before use.
 
-Эти правила соблюдаются не только в коде, но и в агентах: `invariant-guard` проверяет их перед каждым коммитом (см. раздел 13).
+These rules are enforced not only in code but also by agents: `invariant-guard` checks them before every commit (section 13).
 
-### 8.3 Что уже случилось
+### 8.3 What already happened
 
-В ходе работы над скиллом оркестратора в тестовых фикстурах появился выдуманный `eval_v1.json` с придуманными метриками. Эти фикстуры удалены, результаты сохранены вне репозитория. В самом репозитории замороженного набора **пока нет**. Это зафиксировано в [docs/STATUS.md](docs/STATUS.md).
+While building the orchestrator skill, an invented `eval_v1.json` with made-up metrics appeared in test fixtures. Those fixtures were deleted, and the results were kept outside the repository. The repository itself **does not have a frozen set yet**. This is recorded in [docs/STATUS.md](docs/STATUS.md).
 
 ---
 
-## 9. Локальный запуск
+## 9. Local setup
 
-### 9.1 Что нужно
+### 9.1 Requirements
 
-- Git 2.43 или новее, Python 3.12, uv. Команды ниже написаны для bash.
-- Репозиторий: ваша локальная копия.
-- Файл `.env` в корне репозитория. Шаблон — `.env.example`.
+- Git 2.43 or newer, Python 3.12, uv. Commands below are written for bash.
+- A local copy of the repository.
+- A `.env` file in the repository root. Template: `.env.example`.
 
-### 9.2 Первый запуск
+### 9.2 First run
 
 ```bash
-cd <путь к репозиторию>
-uv sync                                  # когда появится pyproject.toml
+cd <path-to-repository>
+uv sync                                  # once pyproject.toml exists
 CORE_MODE=stub uv run uvicorn app.main:app --app-dir backend --port 8000 --reload
 ```
 
-В другом окне:
+In another terminal:
 
 ```bash
 bash .claude/skills/run-app/scripts/smoke.sh http://127.0.0.1:8000
 ```
 
-### 9.3 Режимы
+### 9.3 Modes
 
-- **`CORE_MODE=stub`** — классификатор отвечает детерминированно, ключ не нужен, сети не нужно. Используется для разработки, тестов и демо без денег.
-- **`CORE_MODE=live`** — реальные вызовы моделей через AI Router. Нужен ключ в `.env` и проверенный список `CORE_MODELS`. Включается осознанно.
+- **`CORE_MODE=stub`**: the classifier answers deterministically; no key and no network needed. Used for development, tests and demos without spending credits.
+- **`CORE_MODE=live`**: real model calls through AI Router. Needs the key in `.env` and a verified `CORE_MODELS` list. Enabled deliberately.
 
-Проверить список моделей (ключ вводите в свою оболочку, не в чат):
+To list the models (put the key into your shell, never into a chat):
 
 ```bash
 curl -s -H "Authorization: Bearer $AI_ROUTER_API_KEY" https://router.hostinger.com/v1/models
 ```
 
-Значения моделей копируйте в `CORE_MODELS` только после проверки.
+This endpoint does not check the key, so a 200 response does not prove the key is valid. Confirm the key with a chat request.
+
+Copy model IDs into `CORE_MODELS` only after they are verified.
 
 ---
 
-## 10. Тесты и оценка
+## 10. Tests and evaluation
 
-### 10.1 Тесты
-
-```bash
-uv run pytest -q                    # все тесты
-uv run pytest backend/tests/game -q # один модуль
-```
-
-Принципы: мало, но по делу. Для каждой функции — happy path и один случай отказа; плюс инвариантные тесты (нет утечки eval в промпт, спаны — точные подстроки, пример 87/27/100/71 сохраняется, ключ не попадает в вывод). Тесты не ходят в сеть и не вызывают модели. Скилл `write-tests` описывает это подробно.
-
-### 10.2 Оценка
-
-Оценка запускается по замороженному набору и пишет результаты JSON, которые читает `/metrics`:
+### 10.1 Tests
 
 ```bash
-uv run python -m eval.run --eval-version eval_v1 --mode live   # только когда есть ключ и утверждённый набор
-uv run python -m eval.run --eval-version eval_v1 --mode stub   # пишет только в results/stub/
+uv run pytest -q                    # all tests
+uv run pytest backend/tests/game -q # one module
 ```
 
-Перед запуском runner проверяет SHA-256 всех файлов набора. Если файл изменён, он отказывается работать.
+Principles: few tests, each meaningful. For each function: a happy path and one failure case; plus invariant tests (no eval leakage into the prompt, spans are exact substrings, the 87/27/100/71 example still holds, the key does not appear in output). Tests make no network calls and call no models. The `write-tests` skill describes this in detail.
+
+### 10.2 Evaluation
+
+The evaluation runs on the frozen set and writes the JSON results that `/metrics` reads:
+
+```bash
+uv run python -m eval.run --eval-version eval_v1 --mode live   # only with a key and an approved set
+uv run python -m eval.run --eval-version eval_v1 --mode stub   # writes only to results/stub/
+```
+
+Before running, the runner verifies the SHA-256 of every file in the set. If a file changed, it refuses to run.
+
+These commands describe the planned interface; they exist once the eval-metrics agent has built them.
 
 ---
 
-## 11. Деплой на Hostinger
+## 11. Deployment on Hostinger
 
-### 11.1 Что уже есть на сервере
+### 11.1 What is already on the server
 
-- Хост `srv2160832.hstgr.cloud`, IP `31.220.55.73`, Ubuntu 24.04, 2 vCPU, 7.8 GB RAM.
-- Пользователь `deploy` (SSH по ключу, sudo без пароля, группа docker). Вход root только по ключу. Вход по паролю отключён.
-- Firewall ufw: открыты 22, 80, 443 и 32768.
-- **Traefik** (от Hostinger) занимает 80 и 443, сам выпускает сертификаты Let's Encrypt и маршрутизирует по меткам контейнеров.
-- **Hermes Agent** (шаблон Hostinger) работает на порту 32768 и не трогается.
-- **hello-world** (`/opt/spotthespin/hello`) отвечает по https://srv2160832.hstgr.cloud.
+- Host `srv2160832.hstgr.cloud`, IP `31.220.55.73`, Ubuntu 24.04, 2 vCPU, 7.8 GB RAM.
+- User `deploy` (SSH key login, passwordless sudo, docker group). Root login only by key. Password login disabled.
+- ufw firewall: ports 22, 80, 443 and 32768 open.
+- **Traefik** (from Hostinger) owns ports 80 and 443, issues Let's Encrypt certificates and routes by container labels.
+- **Hermes Agent** (Hostinger template) runs on port 32768 and is left untouched.
+- **hello-world** (`/opt/spotthespin/hello`) answers at https://srv2160832.hstgr.cloud.
 
-Подробнее: [docs/INFRA.md](docs/INFRA.md).
+Details: [docs/INFRA.md](docs/INFRA.md).
 
-### 11.2 Как сервис подключается к Traefik
+### 11.2 How a service connects to Traefik
 
-Наш контейнер **не публикует порты**. Traefik находит его по меткам:
+Our container **publishes no ports**. Traefik finds it through labels:
 
 ```yaml
 labels:
@@ -385,189 +389,189 @@ labels:
   - traefik.http.services.<name>.loadbalancer.server.port=8000
 ```
 
-Рабочий пример — `/opt/spotthespin/hello/docker-compose.yml` на сервере.
+The working example is `/opt/spotthespin/hello/docker-compose.yml` on the server.
 
-**Важно:** после обновления или перезапуска Docker-демона нужно перезапустить Traefik: `docker restart traefik-traefik-1`. Иначе Traefik теряет сокет Docker и перестаёт видеть метки (это уже случилось 2026-11-14).
+**Important:** after updating or restarting the Docker daemon, restart Traefik: `docker restart traefik-traefik-1`. Otherwise Traefik loses the Docker socket and stops seeing labels. This already happened on 2026-11-14.
 
-### 11.3 Порядок деплоя
+### 11.3 Deployment order
 
-Деплой выполняется **только после явного подтверждения пользователя**. Агенты его не выполняют.
+Deployment happens **only after an explicit confirmation from the user**. Agents never deploy.
 
-1. Агент `infra-deployer` готовит `Dockerfile`, `docker-compose.yml`, `.dockerignore` и `docs/DEPLOY.md`.
-2. Локально: `docker compose config`, сборка, smoke (скилл `run-app`, режим 2).
-3. Пользователь подтверждает.
-4. На сервере (по runbook из `docs/DEPLOY.md`): обновить код, создать `/opt/spotthespin/app/.env` вручную с правами `600`, `docker compose build && docker compose up -d`.
-5. Публичная проверка (только чтение): скилл `run-app`, режим 3.
-6. Откат: предыдущий образ, описание в runbook.
+1. The `infra-deployer` agent prepares `Dockerfile`, `docker-compose.yml`, `.dockerignore` and `docs/DEPLOY.md`.
+2. Locally: `docker compose config`, build, smoke test (`run-app` skill, mode 2).
+3. The user confirms.
+4. On the server (following the runbook in `docs/DEPLOY.md`): update the code, create `/opt/spotthespin/app/.env` by hand with permissions `600`, run `docker compose build && docker compose up -d`.
+5. Public check (read-only): `run-app` skill, mode 3.
+6. Rollback: previous image, described in the runbook.
 
-Файл `.env` с сервера в репозиторий **не копируется** и в образ не попадает (см. `.dockerignore`).
+The server's `.env` is **never copied** into the repository and never ends up in the image (see `.dockerignore`).
 
-### 11.4 Hermes на порту 32768
+### 11.4 Hermes on port 32768
 
-Порт опубликован наружу. ufw не фильтрует опубликованные Docker-порты, поэтому правило ufw его не закрывает. Закрыть можно только изменив публикацию порта в конфиге Hermes. Это решение пользователя.
+The port is published to the internet. ufw does not filter published Docker ports, so the ufw rule does not close it. It can only be closed by changing the port publication in Hermes's configuration. That is the user's decision.
 
 ---
 
-## 12. Переменные окружения
+## 12. Environment variables
 
-Значения секретов не записываются ни в репозиторий, ни в документацию, ни в чат.
+Secret values are never written into the repository, the documentation or the chat.
 
-| Переменная | Пример | Секрет | Где взять |
+| Variable | Example | Secret | Where to get it |
 |---|---|---|---|
-| `AI_ROUTER_BASE_URL` | `https://router.hostinger.com/v1` | нет | [Hostinger, раздел AI Router](https://www.hostinger.com/support/?p=19146) |
-| `AI_ROUTER_API_KEY` | `sk-hstgr-…` | **да** | панель Hostinger → AI Router |
-| `CORE_MODE` | `stub` или `live` | нет | по умолчанию `stub` |
-| `CORE_MODELS` | ID через запятую | нет | проверить через `GET /v1/models` |
-| `DB_PATH` | `data/app.db` | нет | по умолчанию |
-| `VPS_HOST` | `31.220.55.73` | нет (не публиковать без нужды) | панель Hostinger |
-| `VPS_USER` | `deploy` | нет | наш пользователь на сервере |
-| `VPS_SSH_KEY_PATH` | `~/.ssh/id_ed25519` | **да** (файл) | локальный ключ на личной машине, публичная часть уже на сервере |
-| `PUBLIC_DOMAIN` | `srv2160832.hstgr.cloud` | нет | панель Hostinger |
+| `AI_ROUTER_BASE_URL` | `https://router.hostinger.com/v1` | no | [Hostinger, AI Router section](https://www.hostinger.com/support/?p=19146) |
+| `AI_ROUTER_API_KEY` | `sk-hstgr-…` | **yes** | Hostinger panel → AI Router |
+| `CORE_MODE` | `stub` or `live` | no | default `stub` |
+| `CORE_MODELS` | comma-separated IDs | no | verify with `GET /v1/models` |
+| `DB_PATH` | `data/app.db` | no | default |
+| `VPS_HOST` | `31.220.55.73` | no (do not publish needlessly) | Hostinger panel |
+| `VPS_USER` | `deploy` | no | our user on the server |
+| `VPS_SSH_KEY_PATH` | `~/.ssh/id_ed25519` | **yes** (file) | local key on the personal machine; its public part is already on the server |
+| `PUBLIC_DOMAIN` | `srv2160832.hstgr.cloud` | no | Hostinger panel |
 
-Правила:
-- `.env` и `secrets/` закрыты в `.gitignore` и `.dockerignore`.
-- Ключ читается только через `app.config`, в `repr` и логах не появляется.
-- На сервере `.env` создаётся вручную, права `600`.
-- Если ключ утёк, его перевыпускают в панели Hostinger. Удаления строки недостаточно.
+Rules:
+- `.env` and `secrets/` are excluded in `.gitignore` and `.dockerignore`.
+- The key is read only through `app.config` and never appears in `repr` or logs.
+- On the server, `.env` is created by hand with permissions `600`.
+- If a key leaks, reissue it in the Hostinger panel. Deleting the line is not enough.
 
 ---
 
-## 13. Агенты и скиллы
+## 13. Agents and skills
 
-### 13.1 Агенты сборки (`.claude/agents/`)
+### 13.1 Build agents (`.claude/agents/`)
 
-Каждый агент владеет своими путями. Пересечений нет, поэтому их можно запускать параллельно.
+Each agent owns its own paths. There are no overlaps, so they can run in parallel.
 
-| Агент | Этап | Владеет | Фаза | Скиллы |
+| Agent | Stage | Owns | Phase | Skills |
 |---|---|---|---|---|
-| `foundation-scaffolder` | 0–2 (основа) | `pyproject.toml`, `backend/app/config.py`, `backend/app/core/types.py`, тесты фундамента | A | write-tests |
-| `core-classifier` | 2 | `backend/app/core/` (кроме types) | B | write-tests |
-| `data-curator` | 1 | `data/dev`, `data/eval` (с одобрением), `scripts/data/` | B | write-tests |
-| `game-logic` | 4 (логика) | `backend/app/game/` | B | write-tests |
-| `news-pipeline` | 6 | `backend/app/news/`, `scripts/news/` | B → D | write-tests, run-app (dry-run) |
-| `frontend-builder` | 3–5 (UI) | `frontend/` | B | run-app (обязательно) |
-| `infra-deployer` | 0, 8 | `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `deploy/`, `docs/DEPLOY.md` | B | write-tests, run-app (только локально) |
-| `api-backend` | 4–5, 8 | `backend/app/main.py`, `api/`, `db.py`, `security/` | C | write-tests, run-app (обязательно) |
+| `foundation-scaffolder` | 0–2 (foundation) | `pyproject.toml`, `backend/app/config.py`, `backend/app/core/types.py`, foundation tests | A | write-tests |
+| `core-classifier` | 2 | `backend/app/core/` (except types) | B | write-tests |
+| `data-curator` | 1 | `data/dev`, `data/eval` (with approval), `scripts/data/` | B | write-tests |
+| `game-logic` | 4 (logic) | `backend/app/game/` | B | write-tests |
+| `news-pipeline` | 6 | `backend/app/news/`, `scripts/news/` | B → D | write-tests, run-app (dry run) |
+| `frontend-builder` | 3–5 (UI) | `frontend/` | B | run-app (mandatory) |
+| `infra-deployer` | 0, 8 | `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `deploy/`, `docs/DEPLOY.md` | B | write-tests, run-app (local only) |
+| `api-backend` | 4–5, 8 | `backend/app/main.py`, `api/`, `db.py`, `security/` | C | write-tests, run-app (mandatory) |
 | `eval-metrics` | 3 | `backend/eval/` | C | write-tests |
-| `invariant-guard` | ворота | ничего (только читает) | D и перед каждым коммитом | — |
+| `invariant-guard` | gate | nothing (read-only) | D and before every commit | — |
 
-Каждый агент в своём описании содержит:
-- что читать перед работой;
-- что он владеет и чего не трогает;
-- требования и критерии приёмки;
-- **обязательный шаг после реализации**: вызвать скилл `write-tests` и, где указано, `run-app`;
-- запреты: нет коммитам, push, merge, rebase; нет деплоя; нет чтения `.env` и `secrets/`.
+Each agent definition contains:
+- what to read before starting;
+- what it owns and what it must not touch;
+- requirements and acceptance criteria;
+- **a mandatory step after implementation**: invoke the `write-tests` skill and, where listed, `run-app`;
+- prohibitions: no commit, push, merge or rebase; no deployment; no reading of `.env` or `secrets/`.
 
-### 13.2 Скиллы (`.claude/skills/`)
+### 13.2 Skills (`.claude/skills/`)
 
-| Скилл | Когда вызывается | Что делает |
+| Skill | When it is invoked | What it does |
 |---|---|---|
-| `write-tests` | автоматически после реализации модуля | пишет минимальный pytest-набор: критерии приёмки, один случай отказа на функцию, инвариантные тесты; без сети и без живых моделей |
-| `run-app` | автоматически после изменения API, фронтенда или инфраструктуры | поднимает приложение в режиме stub, запускает `scripts/smoke.sh`, останавливает; публичную проверку делает только на просьбу, только чтением |
-| `repo-orchestrator` | когда вы просите «что дальше», «запусти агентов» | ведёт статус, раздаёт работу агентам, проверяет результат, спрашивает вас там, где решение за вами |
+| `write-tests` | automatically after a module is implemented | writes a minimal pytest set: acceptance criteria, one failure case per function, invariant tests; no network, no live models |
+| `run-app` | automatically after an API, frontend or infrastructure change | starts the app in stub mode, runs `scripts/smoke.sh`, stops it; public check only on request, read-only |
+| `repo-orchestrator` | when you ask "what's next", "launch the agents" | keeps the status, dispatches work to agents, verifies results, asks you where the decision is yours |
 
-Скиллы намеренно короткие и без лишних тестов для самих себя: проверка одним smoke-прогоном, если он применим.
+Skills are deliberately short and do not generate extra tests for themselves: one smoke run where applicable.
 
 ### 13.3 `invariant-guard`
 
-Это читающий агент, он ничего не меняет. Проверяет:
-1. Тестовый набор не изменён.
-2. В промпт и dev не попали тексты из eval.
-3. Dev и eval не пересекаются.
-4. В файлах нет секретов (`sk-hstgr-`, приватные ключи, пароли); `.env` и `secrets/` игнорируются git.
-5. В тестах нет вызовов живых моделей.
-6. Каждый изменённый файл принадлежит ровно одному агенту.
-7. Агенты не делали коммитов.
-8. Результаты в режиме stub не выдаются за настоящие.
-9. Есть только одно ядро классификации.
-10. Нет скриптов, которые сами ходят на сервер без подтверждения.
+This is a read-only agent; it changes nothing. It checks:
+1. The test set has not changed.
+2. No text from eval appears in the prompt or in dev.
+3. Dev and eval do not overlap.
+4. No secrets in files (`sk-hstgr-`, private keys, passwords); `.env` and `secrets/` are git-ignored.
+5. No live model calls in tests.
+6. Every changed file belongs to exactly one agent.
+7. Agents made no commits.
+8. Stub results are not presented as real ones.
+9. There is only one classifier core.
+10. No script contacts the server without confirmation.
+11. No Cyrillic in repository files (chat with the user may be in Russian; repository content is English).
 
-Вердикт: `OK` или `BLOCK` с доказательствами (`путь:строка`). Коммит не предлагается, пока вердикт не `OK`.
+Verdict: `OK` or `BLOCK` with evidence (`path:line`). No commit is proposed until the verdict is `OK`.
 
 ---
 
-## 14. Как оркестратор собирает приложение
+## 14. How the orchestrator builds the application
 
-Оркестратор (`.claude/skills/repo-orchestrator/SKILL.md`) ведёт цикл: **осмотреться → решить → раздать → проверить → доложить**. Он сам почти не пишет код, а раздаёт работу агентам по фазам.
+The orchestrator (`.claude/skills/repo-orchestrator/SKILL.md`) runs the cycle **look → decide → dispatch → verify → report**. It writes little code itself and dispatches work to agents by phase.
 
-| Фаза | Кто | Почему именно так |
+| Phase | Who | Why |
 |---|---|---|
-| **A** | `foundation-scaffolder` (один) | все остальные зависят от `pyproject.toml`, настроек и типов контракта |
-| **B** (параллельно) | `core-classifier`, `data-curator`, `game-logic`, `news-pipeline` (чистые части), `frontend-builder` (mock-режим), `infra-deployer` (только локально) | не пересекаются по файлам, зависят только от фазы A |
-| **C** (параллельно) | `api-backend` (нужны ядро и игра), `eval-metrics` (нужны ядро, игра и утверждённый набор) | зависят от результатов B |
-| **D** | `news-pipeline` (интеграция с БД после `db.py`), затем `invariant-guard` по всему пакету | проверка перед любым коммитом |
+| **A** | `foundation-scaffolder` (alone) | everything else depends on `pyproject.toml`, settings and contract types |
+| **B** (parallel) | `core-classifier`, `data-curator`, `game-logic`, `news-pipeline` (pure parts), `frontend-builder` (mock mode), `infra-deployer` (local only) | no file overlaps; depend only on phase A |
+| **C** (parallel) | `api-backend` (needs core and game), `eval-metrics` (needs core, game and an approved set) | depend on phase B results |
+| **D** | `news-pipeline` (database integration after `db.py`), then `invariant-guard` over the whole batch | check before any commit |
 
-Правила оркестратора:
-- Бриф агенту пишется самодостаточным: цель, владение файлами, контракты, критерии приёмки, формат отчёта.
-- Отчёт агента не принимается на веру: оркестратор запускает `uv run pytest -q` и `smoke.sh` сам.
-- Агенту не поручают деплой, заморозку набора и живые вызовы моделей без вашего «да» в этом разговоре.
-- Коммит и push — только после вашего явного одобрения и при вердикте `OK` от `invariant-guard`.
+Orchestrator rules:
+- A brief for an agent is self-contained: goal, owned files, contracts, acceptance criteria, report format.
+- An agent's report is not taken on trust: the orchestrator runs `uv run pytest -q` and `smoke.sh` itself.
+- Agents are not asked to deploy, freeze a set or make live model calls without your explicit yes in this conversation.
+- Commit and push happen only after your explicit approval and an `OK` verdict from `invariant-guard`.
 
 ---
 
-## 15. Git и правила работы
+## 15. Git and working rules
 
 ### 15.1 Git
 
-- Git: обычная команда `git` из корня репозитория, версия 2.43 или новее.
-- Identity уже записан в `.git/config` (Julia Fiklistova). Не менять.
-- Ветка `main`. Агенты не коммитят: их правки остаются в рабочем дереве.
-- Коммит только явными путями (`git add <path>`), не `git add -A`.
-- **Коммит, push, merge и деплой — только после явного «да» в разговоре.** Одобрение одного коммита не переносится на следующий.
+- Plain `git` from the repository root, version 2.43 or newer.
+- Git identity is already set in `.git/config`. Do not change it.
+- Branch `main`. Agents do not commit; their changes stay in the working tree.
+- Commit with explicit paths (`git add <path>`), never `git add -A`.
+- **Commit, push, merge and deployment happen only after an explicit "yes" in the conversation.** Approval of one commit does not carry over to the next.
 
-### 15.2 Правила проекта
+### 15.2 Project rules
 
-Полный список — [docs/RULES.md](docs/RULES.md). Кратко:
-1. Тестовый набор заморожен.
-2. Dev и test не пересекаются.
-3. Синтетика не попадает в оценку.
-4. Споры идут только в dev и только после проверки.
-5. Метрики честные: n, интервалы, FPR, без слияния источников.
-6. Одно ядро классификации.
-7. Секреты только в `.env` и `secrets/`.
-8. Деплой только с подтверждения.
+The full list is in [docs/RULES.md](docs/RULES.md). Summary:
+1. The test set is frozen.
+2. Dev and test do not overlap.
+3. Synthetic data never enters evaluation.
+4. Disputes go only to dev, and only after review.
+5. Metrics are honest: n, intervals, FPR, no merging of sources.
+6. One classifier core.
+7. Secrets only in `.env` and `secrets/`.
+8. Deployment only with confirmation.
 
-### 15.3 Язык
+### 15.3 Language
 
-- Код, имена файлов и идентификаторы — английский.
-- Документация команды (включая этот README) — русский.
-- Скиллы и описания агентов — английский.
+- Everything in the repository is written in **English**: code, identifiers, comments, documentation (including this README), agent and skill definitions, test cases, fixtures, commit messages.
+- Russian is used only in the chat with the user.
 
 ---
 
-## 16. Документация проекта
+## 16. Project documentation
 
-| Файл | Что внутри | Кто меняет |
+| File | Contents | Who changes it |
 |---|---|---|
-| [docs/PLAN.md](docs/PLAN.md) | этапы 0–8, датасеты, правила оценки | пользователь |
-| [docs/STATUS.md](docs/STATUS.md) | состояние этапов, задачи, блокеры, журнал решений | оркестратор после каждого цикла |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | модули, контракт ядра, форматы данных | согласованно |
-| [docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md) | задача, критерии жюри, техники, датасеты, решения | по мере узнавания |
-| [docs/RULES.md](docs/RULES.md) | правила репозитория: git, секреты, метрики, деплой | команда |
-| [docs/TOOLS.md](docs/TOOLS.md) | инструменты стека и их статус | по мере изменений |
-| [docs/INFRA.md](docs/INFRA.md) | не секретные факты о сервере, Traefik, Hermes | по мере изменений |
-| `docs/DEPLOY.md` | runbook деплоя | `infra-deployer` (появится) |
+| [docs/PLAN.md](docs/PLAN.md) | stages 0–8, datasets, evaluation rules | the user |
+| [docs/STATUS.md](docs/STATUS.md) | stage status, tasks, blockers, decision log | the orchestrator after every cycle |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | modules, core contract, data formats | by agreement |
+| [docs/KNOWLEDGE_BASE.md](docs/KNOWLEDGE_BASE.md) | challenge, jury criteria, techniques, datasets, decisions | as the project learns |
+| [docs/RULES.md](docs/RULES.md) | repository rules: git, secrets, metrics, deployment, language | the team |
+| [docs/TOOLS.md](docs/TOOLS.md) | stack tools and their status | as things change |
+| [docs/INFRA.md](docs/INFRA.md) | non-secret facts about the server, Traefik, Hermes | as things change |
+| `docs/DEPLOY.md` | deployment runbook | `infra-deployer` (to be created) |
 
 ---
 
-## 17. Частые проблемы
+## 17. Common problems
 
-**Публичный адрес показывает сертификат `TRAEFIK DEFAULT CERT`.** Traefik не нашёл маршрут или ещё не выпустил сертификат. Проверьте метки контейнера и перезапустите Traefik: `docker restart traefik-traefik-1`. Перезапуск делает администратор сервера, с вашего «да».
+**The public address shows the `TRAEFIK DEFAULT CERT` certificate.** Traefik did not find a route or has not issued a certificate yet. Check the container labels and restart Traefik: `docker restart traefik-traefik-1`. The server administrator performs the restart, with your approval.
 
-**Публичный адрес отвечает 404 от Traefik.** Контейнер не запущен, или `Host(...)` в метках не совпадает с доменом.
+**The public address returns 404 from Traefik.** The container is not running, or the `Host(...)` label does not match the domain.
 
-**`smoke.sh` пишет «Is this the Spot the Spin app?».** Это не наш сервер или `/api/health` не отдаёт `{"ok": true}`. Скрипт специально не засчитывает остальные проверки, если health не наш: сервер может отвечать 200 на любой путь.
+**`smoke.sh` prints "Is this the Spot the Spin app?".** The server is not ours, or `/api/health` does not return `{"ok": true}`. The script deliberately stops early in that case: a server may answer 200 on any path.
 
-**`uv` не находит проект.** Запускайте из корня репозитория и убедитесь, что `pyproject.toml` существует (появится после фазы A).
+**`uv` cannot find the project.** Run it from the repository root and make sure `pyproject.toml` exists (created in phase A).
 
-**Команда `git` не найдена.** Установите Git 2.43 или новее и откройте терминал заново. Правила работы с git — раздел 15.
+**The `git` command is not found.** Install Git 2.43 or newer and open a new terminal. Git working rules are in section 15.
 
-**После обновления Docker на сервере сервисы «пропали» из маршрутизации.** Перезапустите Traefik (см. раздел 11.2).
+**After a Docker update on the server, services disappeared from routing.** Restart Traefik (see section 11.2).
 
-**Ключ AI Router не работает.** Проверьте, что он начинается с `sk-hstgr-`, что `AI_ROUTER_BASE_URL` = `https://router.hostinger.com/v1`, и что в `CORE_MODE` стоит `live`. В режиме `stub` ключ не нужен вообще.
+**The AI Router key does not work.** Check that it starts with `sk-hstgr-`, that `AI_ROUTER_BASE_URL` is `https://router.hostinger.com/v1`, and that `CORE_MODE` is `live`. In `stub` mode no key is needed at all.
 
 ---
 
-## 18. Лицензия
+## 18. License
 
-См. файл [LICENSE](LICENSE).
+See [LICENSE](LICENSE).

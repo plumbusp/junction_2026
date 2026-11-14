@@ -1,57 +1,57 @@
-# Правила репозитория
+# Repository rules
 
-Written for: команда (Julia и агенты). Обновляется по решению команды.
+Written for: the team (Julia and the agents). Changed only by team decision.
 
 ## 1. Git
 
-- Git запускается из корня репозитория обычной командой `git`.
-- **Коммит, push, merge и деплой делаются только после явного «да» в разговоре.** Одобрение одного коммита не распространяется на следующий.
-- Коммитить явными путями (`git add <path>`), а не `git add -A`. Так в коммит не попадут чужие или недоделанные файлы.
-- Identity уже настроена в `.git/config` (Julia Fiklistova). Не менять.
-- Ветка `main`. Агенты не коммитят: их правки остаются в рабочем дереве, коммитит человек.
+- Run git from the repository root with the plain `git` command.
+- **Commit, push, merge and deployment happen only after an explicit "yes" in the conversation.** Approval of one commit does not carry over to the next.
+- Commit with explicit paths (`git add <path>`), never `git add -A`. This keeps other people's or unfinished files out of the commit.
+- Git identity is already set in `.git/config` (Julia Fiklistova). Do not change it.
+- Branch `main`. Agents do not commit: their changes stay in the working tree, and a human commits.
 
-## 2. Секреты
+## 2. Secrets
 
-- Ключи и пароли живут только в двух местах: `.env` в корне репо и каталог `secrets/` (SSH-ключи). Оба закрыты в `.gitignore` и `.dockerignore`.
-- Ключи не пишутся в код, docs, брифы агентов, логи, коммиты и чат. Если значение нужно в разговоре, пишем имя переменной, а не значение.
-- **В прод секреты не попадают из репо.** На VPS файл `.env` создаётся вручную, права `600`. Образ собирается без `.env` (см. `.dockerignore`).
-- `.env.example` содержит только имена переменных.
-- Если ключ утёк (попал в коммит, чат или лог), его нужно перевыпустить в панели Hostinger. Удалить строку из файла недостаточно: копия уже могла уйти.
-- Проверка перед коммитом: `git check-ignore -v .env` должен показать совпадение с правилом.
+- Keys and passwords live in only two places: `.env` in the repository root and the `secrets/` directory (SSH keys). Both are excluded in `.gitignore` and `.dockerignore`.
+- Keys are never written into code, docs, agent briefs, logs, commits or chat. If a value is needed in a conversation, name the variable, not the value.
+- **Production secrets never come from the repository.** On the VPS, `.env` is created by hand with permissions `600`. The image is built without `.env` (see `.dockerignore`).
+- `.env.example` contains only variable names.
+- If a key leaks (into a commit, chat or log), reissue it in the Hostinger panel. Deleting the line from the file is not enough: a copy may already be out.
+- Check before committing: `git check-ignore -v .env` must show the matching rule.
 
-## 3. Честность метрик
+## 3. Metric honesty
 
-Эти правила защищают главный аргумент для жюри. Нарушение не видно в демо, но обесценивает метрики.
+These rules protect the main argument for the jury. A violation is invisible in a demo but invalidates the metrics.
 
-1. `data/eval/` после заморозки не меняется и не используется для few-shot, подбора промптов или порогов. Подбор идёт на `data/dev/`.
-2. Dev и test не пересекаются. Перед добавлением данных проверяем дубликаты по нормализованному тексту.
-3. Синтетические заголовки (от LLM) допустимы только как few-shot и для демо, но не для оценки.
-4. Споры игроков попадают только в dev и только после ревью.
-5. Метрики честные: размер выборки, доверительные интервалы, FPR на «no technique». Источники не сливаются в одну цифру.
-6. Игра, Analyze и /metrics вызывают одно ядро. Второй «упрощённый» классификатор не делаем.
-7. Сырые датасеты (PTC и др.) не коммитим, пока не проверена лицензия. Они лежат в `data/raw/`.
+1. `data/eval/` is never changed after freezing and is never used for few-shot examples, prompt tuning or thresholds. Tuning uses `data/dev/`.
+2. Dev and test do not overlap. Before adding data, check for duplicates on normalised text.
+3. Synthetic headlines (LLM-generated) are allowed only as few-shot examples and for demos, never for evaluation.
+4. Player disputes go only into dev, and only after review.
+5. Metrics are honest: sample size, confidence intervals, FPR on "no technique". Sources are never merged into one number.
+6. The game, Analyze and /metrics call one core. A second, "simplified" classifier is not built.
+7. Raw datasets (PTC and others) are not committed until their licence is checked. They live in `data/raw/`.
 
-## 4. Деплой
+## 4. Deployment
 
-- Деплой на Hostinger VPS — только после подтверждения человеком.
-- Перед деплоем: тесты зелёные, результаты eval обновлены, `.env` не попадает в образ, проверено `/health` на публичном URL.
-- Откат: предыдущий образ, описание в runbook (появится в `docs/DEPLOY.md` вместе с Dockerfile).
+- Deployment to the Hostinger VPS happens only after the user confirms it.
+- Before deploying: tests are green, eval results are up to date, `.env` does not end up in the image, `/health` is verified on the public URL.
+- Rollback: previous image, described in the runbook (`docs/DEPLOY.md`, created together with the Dockerfile).
 
-## 5. Язык
+## 5. Language
 
-- Код, имена файлов и идентификаторы — английский.
-- Документация команды — русский.
-- Скиллы в `.claude/skills/` — английский.
+- **Everything in the repository is written in English**: code, identifiers, comments, documentation, agent and skill definitions, test cases and fixtures, commit messages.
+- Russian is used only in the chat with the user.
+- Existing files must not contain Cyrillic. `invariant-guard` checks this before every commit.
 
-## 6. Что где лежит
+## 6. What lives where
 
-| Путь | Роль | Правка |
+| Path | Role | Change rule |
 |---|---|---|
-| `docs/PLAN.md` | план по этапам и датасетам | по решению команды |
-| `docs/STATUS.md` | текущее состояние, блокеры, журнал решений | после каждого цикла |
-| `docs/ARCHITECTURE.md` | модули и контракт ядра `classify()` | согласованно |
-| `docs/KNOWLEDGE_BASE.md` | задача, критерии жюри, техники, датасеты | по мере узнавания |
-| `docs/TOOLS.md` | инструменты стека и их статус | по мере изменений |
-| `docs/INFRA.md` | не секретные факты об инфраструктуре | по мере изменений |
-| `data/eval/` | замороженный тест-набор | только чтение после заморозки |
-| `.env`, `secrets/` | секреты | только локально |
+| `docs/PLAN.md` | plan by stage and dataset | by team decision |
+| `docs/STATUS.md` | current state, blockers, decision log | after every cycle |
+| `docs/ARCHITECTURE.md` | modules and the `classify()` contract | by agreement |
+| `docs/KNOWLEDGE_BASE.md` | challenge, jury criteria, techniques, datasets | as the project learns |
+| `docs/TOOLS.md` | stack tools and their status | as things change |
+| `docs/INFRA.md` | non-secret infrastructure facts | as things change |
+| `data/eval/` | frozen test set | read-only after freezing |
+| `.env`, `secrets/` | secrets | local only |

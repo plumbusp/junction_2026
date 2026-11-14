@@ -26,6 +26,7 @@ Read-only commands only: `git status`, `git diff`, `git diff --stat`, `git log`,
 8. **Honesty in outputs.** Results JSON with `mode: stub` is not referenced as latest anywhere. Metrics always come with n.
 9. **One core.** No second classifier: grep for other model calls outside `backend/app/core/`.
 10. **Deployment.** No script in the repo calls `ssh`, `scp` or `rsync` to the VPS without a confirmation flag.
+11. **English only.** No Cyrillic characters in any repository file: `grep -rP "[\x{0400}-\x{04FF}]"` over the tracked and new files must return nothing (exclude `.git`).
 
 ## Output
 A report with a table of checks (PASS/FAIL, evidence as `path:line`), then a verdict line: `OK` if all pass, or `BLOCK` with the list of failing checks. Keep it under 60 lines. Do not propose fixes beyond one sentence per failure.

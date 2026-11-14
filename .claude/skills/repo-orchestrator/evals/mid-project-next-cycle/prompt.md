@@ -5,4 +5,4 @@ timeout_seconds: 900
 allowed_tools: [Read, Glob, Grep, Skill, Write, Edit, Bash, PowerShell, Agent]
 ---
 
-ок, ядро вроде готово. что дальше? запусти агентов на следующие задачи
+The core is mostly done. What's next? Launch agents for the next tasks.
