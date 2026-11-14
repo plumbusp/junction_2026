@@ -7,9 +7,15 @@ from pathlib import Path
 
 from app import db
 from app.api.deps import PLAYER_COOKIE
+from app.news.job import LINEUP_EVENT, LINEUP_NOTE
 from fastapi.testclient import TestClient
 
-from tests.db.rounds_fixture import DISPUTED, LIVE_MODELS, seed_simple_round
+from tests.db.rounds_fixture import (
+    DISPUTED,
+    LIVE_MODELS,
+    seed_simple_round,
+    stub_verdict,
+)
 
 
 def test_round_shape_has_three_headlines_one_clean_and_no_references(
@@ -137,6 +143,51 @@ def test_finished_daily_challenge_falls_through_to_the_next_round_then_409(
     assert client.get("/api/round").json()["round_id"] == other.round_id
     finish(other.round_id)
     assert client.get("/api/round").status_code == 409
+
+
+def test_lineup_round_is_served_with_the_normal_shape_and_leaks_nothing(
+    make_client, tmp_db_path: Path
+) -> None:
+    refs = [
+        stub_verdict("no_technique", []),
+        stub_verdict("doubt", ["x"]),
+        stub_verdict("appeal_to_fear", ["x"]),
+    ]
+    items = [
+        {"text": f"Invented headline {n}", "outlet": f"Outlet {n}", "published": "2026-11-14T08:00:00Z"}
+        for n in range(3)
+    ]
+    lineup = db.insert_candidate_round(
+        tmp_db_path,
+        event=LINEUP_EVENT,
+        items=items,
+        references=refs,
+        cluster_id=f"lineup-{TODAY}",
+        source_note=LINEUP_NOTE,
+        n_outlets=3,
+    )
+    assert lineup.diversity == 3
+    db.pick_daily_challenge(tmp_db_path, TODAY, [lineup.round_id], "stub")
+    client = make_client(clock=lambda: NOON_UTC)
+
+    res = client.get("/api/round")
+
+    body = res.json()
+    assert set(body) == {"round_id", "date", "event", "source_note", "items", "daily"}
+    assert body["event"] == LINEUP_EVENT and body["daily"] is True
+    assert all(set(item) == {"item_id", "text", "outlet"} for item in body["items"])
+    for leaked in (
+        "technique",
+        "diversity",
+        "no_technique",
+        "doubt",
+        "appeal_to_fear",
+        "story",
+        "leaning\":",
+        "evidence",
+        "votes",
+    ):
+        assert leaked not in res.text
 
 
 def test_no_rounds_is_503_json(client: TestClient) -> None:

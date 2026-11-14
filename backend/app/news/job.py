@@ -8,6 +8,7 @@ Two paths:
   best clusters with the one core (``classify``) and store them as rounds via
   ``app.db.insert_candidate_round``, then designate the daily challenge. It writes no files
   (the production container has no writable data directory) and never logs headline text.
+  It also builds one "lineup" round per day from a wider labelled pool.
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from collections.abc import Callable, Sequence
+from collections import defaultdict
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
@@ -28,12 +30,14 @@ from app.core.cache import CACHE_DIR
 from app.core.classifier import classify
 from app.core.stub import is_stub_verdict
 from app.core.types import Verdict
+from app.game.rounds import LineupHeadline, build_lineup
 from app.news.cluster import (
     DEFAULT_MIN_OUTLETS,
     DEFAULT_THRESHOLD,
     DEFAULT_WINDOW_HOURS,
     Cluster,
     candidate_clusters,
+    cluster_items,
     filter_window,
 )
 from app.news.feeds import FEEDS, LEANING_CAVEAT, Feed, check_unique
@@ -222,6 +226,26 @@ LIVE_NOTE = (
 )
 MIN_LABELLED_PER_CLUSTER = 3  # a round needs three undisputed headlines
 
+LINEUP_EVENT = "Today's lineup: three different stories"
+_LINEUP_NOTE_TAIL = (
+    " They are real RSS headlines, not written or edited by us. An outlet's declared "
+    "leaning describes the outlet, not the headline."
+)
+LINEUP_NOTE = (
+    "The three headlines come from three different stories and three different "
+    "outlets." + _LINEUP_NOTE_TAIL
+)
+# Used only when the pool had no three headlines from three distinct stories.
+LINEUP_NOTE_SHARED_STORY = (
+    "The three headlines come from three different outlets; two of them may be about "
+    "the same story." + _LINEUP_NOTE_TAIL
+)
+
+
+def lineup_cluster_id(local_date: str) -> str:
+    """The stored id of the lineup round of a local date (one lineup per date)."""
+    return f"lineup-{local_date}"
+
 
 class StubVerdictError(RuntimeError):
     """A stub verdict reached the live pipeline. Real rounds must never carry one."""
@@ -250,6 +274,10 @@ class LiveRoundsResult:
     n_unlabelled_clusters: int = 0  # skipped: no model answered, retried later
     n_rounds_deleted: int = 0  # --rebuild-today: today's unanswered rounds removed
     n_rounds_kept: int = 0  # --rebuild-today: today's rounds with answers/disputes
+    n_pool_labelled: int = 0  # lineup pool headlines that received a model verdict
+    n_pool_failed: int = 0  # lineup pool headlines skipped (error or no model answered)
+    lineup_round_id: str | None = None
+    lineup_diversity: int | None = None  # distinct techniques in the lineup (None: no lineup)
     daily_round_id: str | None = None
     daily_diversity: int | None = None  # distinct techniques in the daily (None: no daily)
     ready_round_ids: list[str] = field(default_factory=list)
@@ -270,6 +298,9 @@ class LiveRoundsResult:
             "unlabelled_clusters": self.n_unlabelled_clusters,
             "rounds_deleted": self.n_rounds_deleted,
             "rounds_kept": self.n_rounds_kept,
+            "pool_labelled": self.n_pool_labelled,
+            # 0 when there is no lineup round today.
+            "lineup_diversity": self.lineup_diversity or 0,
             "daily": int(self.daily_round_id is not None),
             # 0 when there is no daily; below 3 means the day's pool lacked variety.
             "daily_diversity": self.daily_diversity or 0,
@@ -302,6 +333,51 @@ def select_headlines(cluster: Cluster, limit: int) -> list[NewsItem]:
     return (first + rest)[:limit]
 
 
+def select_pool(
+    items: Sequence[NewsItem], limit: int, exclude_links: Collection[str] = ()
+) -> list[NewsItem]:
+    """Up to ``limit`` headlines balanced across outlets, newest first within each outlet.
+
+    Round-robin: the newest headline of every outlet, then the second newest of every
+    outlet, and so on. Links in ``exclude_links`` (already chosen for clusters) and repeated
+    links are skipped. Deterministic: the order of ``items`` does not matter.
+    """
+    if limit <= 0:
+        return []
+    seen: set[str] = set(exclude_links)
+    by_outlet: dict[str, list[NewsItem]] = defaultdict(list)
+    for item in sorted(items, key=lambda i: (-i.published.timestamp(), i.link)):
+        if item.link in seen:
+            continue
+        seen.add(item.link)
+        by_outlet[item.outlet].append(item)
+    chosen: list[NewsItem] = []
+    depth = 0
+    while len(chosen) < limit:
+        layer = [queue[depth] for queue in by_outlet.values() if len(queue) > depth]
+        if not layer:
+            break
+        layer.sort(key=lambda i: (-i.published.timestamp(), i.link))
+        chosen.extend(layer[: limit - len(chosen)])
+        depth += 1
+    return chosen
+
+
+def _lineup_headline(
+    item: NewsItem, verdict: Verdict, story_id: str, index: int
+) -> LineupHeadline:
+    return LineupHeadline(
+        id=f"h{index}",
+        story_id=story_id,
+        outlet=item.outlet,
+        text=item.title,
+        reference=verdict,
+        leaning=item.declared_leaning,
+        published=item.published.timestamp(),
+        link=item.link,
+    )
+
+
 def _local_day_bounds(settings: Settings, local_date: str) -> tuple[datetime, datetime]:
     """Start (inclusive) and end (exclusive) of the local day ``local_date`` as aware datetimes."""
     tz = settings_tz(settings)
@@ -320,6 +396,106 @@ def _check_cache_writable() -> None:
         probe.unlink()
     except OSError as exc:
         raise RuntimeError("verdict cache directory is not writable") from exc
+
+
+def _lineup_round(
+    db_path: Path | str,
+    settings: Settings,
+    result: LiveRoundsResult,
+    *,
+    local_date: str,
+    in_window: Sequence[NewsItem],
+    story_of: dict[str, str],
+    feed_names: dict[str, str],
+    classify_fn: Callable[[str], Verdict],
+    live: bool,
+    remaining: int,
+    cluster_links: set[str],
+    lineup_pool: list[LineupHeadline],
+    ready: list[str],
+    fallback: list[str],
+    kept: frozenset[str],
+) -> None:
+    """Label the wider pool, build today's lineup round and store it (once per date).
+
+    An already stored lineup (idempotent by its cluster id) is reused and nothing is
+    labelled. ``remaining`` is what is left of ``daily_max_headlines`` after the clusters.
+    A pool headline that fails (error, or no model answered) is skipped on its own;
+    a stub verdict in live mode still raises. Never logs headline text.
+    """
+    cluster_id = lineup_cluster_id(local_date)
+    stored = db.get_round_by_cluster(db_path, cluster_id)
+    if stored is not None:
+        result.n_rounds_existing += 1
+        result.lineup_round_id = stored.round_id
+        result.lineup_diversity = db.get_round_diversity(db_path, stored.round_id)
+        if stored.status == db.STATUS_READY:
+            (fallback if stored.round_id in kept else ready).append(stored.round_id)
+        return
+
+    items = select_pool(
+        in_window, min(settings.daily_lineup_pool, max(remaining, 0)), cluster_links
+    )
+    for item in items:
+        try:
+            verdict = classify_fn(item.title)
+        except Exception as exc:  # noqa: BLE001 - one headline must not fail the run
+            result.n_pool_failed += 1
+            log.warning("lineup pool headline skipped: %s", type(exc).__name__)
+            continue
+        if live and is_stub_verdict(verdict):
+            raise StubVerdictError("stub verdict in live mode")
+        if not verdict.votes:
+            result.n_pool_failed += 1
+            continue
+        result.n_pool_labelled += 1
+        if not verdict.disputed:
+            lineup_pool.append(
+                _lineup_headline(
+                    item, verdict, story_of.get(item.link, item.link), len(lineup_pool)
+                )
+            )
+
+    lineup = build_lineup(
+        lineup_pool,
+        used_techniques=db.recent_daily_techniques(db_path, local_date),
+        rng_seed=cluster_id,
+    )
+    if lineup is None:
+        return
+    by_link = {item.link: item for item in in_window}
+    rows = []
+    for headline in lineup.headlines:
+        item = by_link[headline.link]
+        rows.append(
+            {
+                "text": item.title,
+                "outlet": feed_names.get(item.outlet, item.outlet),
+                "link": item.link,
+                "published": item.published.astimezone(UTC)
+                .isoformat()
+                .replace("+00:00", "Z"),
+                "declared_leaning": item.declared_leaning,
+            }
+        )
+    inserted = db.insert_candidate_round(
+        db_path,
+        event=LINEUP_EVENT,
+        items=rows,
+        references=[h.reference for h in lineup.headlines],
+        cluster_id=cluster_id,
+        event_date=local_date,
+        source_note=LINEUP_NOTE if lineup.distinct_stories else LINEUP_NOTE_SHARED_STORY,
+        n_outlets=3,
+    )
+    if inserted.created:
+        result.n_rounds_new += 1
+    else:
+        result.n_rounds_existing += 1
+    result.lineup_round_id = inserted.round_id
+    if inserted.status == db.STATUS_READY:
+        result.lineup_diversity = inserted.diversity or None
+        ready.append(inserted.round_id)
 
 
 def run_live_rounds(
@@ -346,8 +522,13 @@ def run_live_rounds(
     to the one core; in live mode a stub verdict raises ``StubVerdictError`` and, with the
     default core, a missing key or an unwritable verdict cache fails before any model is
     called. Each cluster becomes a round whose three headlines have the most distinct
-    reference techniques; finally the most diverse, then most novel ready round is
-    designated the daily challenge for ``local_date``.
+    reference techniques. With ``settings.daily_lineup_pool > 0`` a wider pool of up to that
+    many in-window headlines (round-robin across outlets, not already chosen for a cluster,
+    within what is left of ``daily_max_headlines``) is labelled too, and one "lineup" round
+    (``lineup-<local_date>``: three headlines from three different outlets and, when
+    possible, stories) is built from the cluster and pool headlines. Finally the most
+    diverse, then most novel ready round (event or lineup) is designated the daily
+    challenge for ``local_date``.
 
     ``rebuild`` (``--rebuild-today``): once the feeds were fetched and clustered, today's
     unanswered rounds and today's designation are deleted (``db.reset_day``), so their
@@ -372,12 +553,15 @@ def run_live_rounds(
         raise NoItemsError("no feed returned any item")
     in_window = filter_window(report.items, now, window_hours)
     result.n_in_window = len(in_window)
-    candidates = candidate_clusters(
-        in_window,
-        threshold=threshold,
-        window_hours=window_hours,
-        min_outlets=min_outlets,
+    if min_outlets < 1:
+        raise ValueError(f"min_outlets must be at least 1, got {min_outlets}")
+    all_clusters = cluster_items(
+        in_window, threshold=threshold, window_hours=window_hours
     )
+    candidates = [c for c in all_clusters if c.n_outlets >= min_outlets]
+    # Story of every in-window headline (singletons included): the lineup uses it to
+    # prefer three different stories.
+    story_of = {item.link: c.cluster_id for c in all_clusters for item in c.items}
     result.n_candidates = len(candidates)
     top = rank_clusters(candidates)[: settings.daily_max_clusters]
     result.n_clusters_used = len(top)
@@ -411,6 +595,8 @@ def run_live_rounds(
             (fallback if stored.round_id in kept else pool).append(stored.round_id)
 
     remaining = settings.daily_max_headlines
+    cluster_links: set[str] = set()  # headlines chosen for clusters (not repeated in the pool)
+    lineup_pool: list[LineupHeadline] = []
     for index, cluster in enumerate(pending):
         if remaining < MIN_LABELLED_PER_CLUSTER:
             break
@@ -430,6 +616,14 @@ def run_live_rounds(
             if live and is_stub_verdict(verdict):
                 raise StubVerdictError("stub verdict in live mode")
             verdicts.append(verdict)
+        for item, verdict in zip(chosen, verdicts, strict=True):
+            cluster_links.add(item.link)
+            if verdict.votes and not verdict.disputed:
+                lineup_pool.append(
+                    _lineup_headline(
+                        item, verdict, cluster.cluster_id, len(lineup_pool)
+                    )
+                )
         if any(not v.votes for v in verdicts):
             # No model answered for some headline: do not freeze a degraded round.
             result.n_unlabelled_clusters += 1
@@ -462,6 +656,25 @@ def run_live_rounds(
         if inserted.status == db.STATUS_READY:
             pool.append(inserted.round_id)
 
+    if settings.daily_lineup_pool > 0:
+        _lineup_round(
+            db_path,
+            settings,
+            result,
+            local_date=local_date,
+            in_window=in_window,
+            story_of=story_of,
+            feed_names=feed_names,
+            classify_fn=classify_fn,
+            live=live,
+            remaining=remaining,
+            cluster_links=cluster_links,
+            lineup_pool=lineup_pool,
+            ready=pool,
+            fallback=fallback,
+            kept=kept,
+        )
+
     n_ready = len(pool) + len(fallback)
     result.n_ready = n_ready
     result.n_ineligible = result.n_rounds_new + result.n_rounds_existing - n_ready
@@ -471,8 +684,8 @@ def run_live_rounds(
     ) or db.pick_daily_challenge(db_path, local_date, fallback, settings.core_mode)
     if result.daily_round_id is not None:
         result.daily_diversity = db.get_round_diversity(db_path, result.daily_round_id)
-    if result.n_unlabelled_clusters and not (
-        result.n_rounds_new or result.n_rounds_existing
+    if (result.n_unlabelled_clusters or result.n_pool_failed) and not (
+        result.n_rounds_new or result.n_rounds_existing or result.n_pool_labelled
     ):
         raise LabellingUnavailableError("no cluster could be labelled")
     log.info("daily rounds: %s", result.counts())

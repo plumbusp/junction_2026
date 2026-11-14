@@ -36,7 +36,13 @@ class Labeller:
 
 
 def _settings(**overrides) -> Settings:
-    params = {"core_mode": "stub", "daily_max_clusters": 5, "daily_max_headlines": 24}
+    # Lineups are off here: these tests cover the event rounds (see test_lineup_rounds.py).
+    params = {
+        "core_mode": "stub",
+        "daily_max_clusters": 5,
+        "daily_max_headlines": 24,
+        "daily_lineup_pool": 0,
+    }
     params.update(overrides)
     return Settings(**params)
 

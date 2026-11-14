@@ -503,6 +503,25 @@ def get_daily_challenge(db_path: Path | str, local_date: str) -> str | None:
     return row["round_id"] if row else None
 
 
+def _recent_daily_techniques(conn: sqlite3.Connection, local_date: str) -> set[str]:
+    recent = conn.execute(
+        "SELECT r.techniques FROM daily_challenge d JOIN rounds r"
+        " ON r.round_id = d.round_id WHERE d.local_date < ?"
+        " ORDER BY d.local_date DESC LIMIT ?",
+        (local_date, NOVELTY_WINDOW),
+    ).fetchall()
+    used: set[str] = set()
+    for entry in recent:
+        used.update(json.loads(entry["techniques"] or "[]"))
+    return used
+
+
+def recent_daily_techniques(db_path: Path | str, local_date: str) -> frozenset[str]:
+    """Techniques of the ``NOVELTY_WINDOW`` daily challenges before ``local_date``."""
+    with connect(db_path) as conn:
+        return frozenset(_recent_daily_techniques(conn, local_date))
+
+
 def pick_daily_challenge(
     db_path: Path | str,
     local_date: str,
@@ -543,15 +562,7 @@ def pick_daily_challenge(
         ).fetchall()
         if not rows:
             return None
-        recent = conn.execute(
-            "SELECT r.techniques FROM daily_challenge d JOIN rounds r"
-            " ON r.round_id = d.round_id WHERE d.local_date < ?"
-            " ORDER BY d.local_date DESC LIMIT ?",
-            (local_date, NOVELTY_WINDOW),
-        ).fetchall()
-        used: set[str] = set()
-        for entry in recent:
-            used.update(json.loads(entry["techniques"] or "[]"))
+        used = _recent_daily_techniques(conn, local_date)
 
         def novelty(row: sqlite3.Row) -> int:
             return len(set(json.loads(row["techniques"] or "[]")) - used)

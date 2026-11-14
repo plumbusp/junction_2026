@@ -13,6 +13,7 @@ the same round, and the order of the pool does not matter.
 
 from __future__ import annotations
 
+import hashlib
 import random
 from collections import defaultdict
 from collections.abc import Iterable
@@ -96,6 +97,117 @@ def _best_subsets(
     if not has_clean and best_score[0] < HEADLINES_PER_ROUND:
         return 0, []
     return best_score[0], best
+
+
+# ---------- Lineup rounds: three headlines from three different stories ----------
+
+# Per (outlet, technique) only the freshest few headlines compete: it bounds the search
+# (outlets x techniques x this) without dropping any outlet/technique combination.
+LINEUP_PER_SLOT = 2
+
+
+@dataclass(frozen=True)
+class LineupHeadline:
+    id: str  # unique within the pool
+    story_id: str  # headlines about the same story share it (the news cluster id)
+    outlet: str  # stable outlet id
+    text: str
+    reference: Verdict
+    leaning: str = ""  # declared leaning of the outlet (not of the headline)
+    published: float = 0.0  # POSIX seconds
+    link: str = ""  # informational: lets the caller find the source item
+
+    @property
+    def is_clean(self) -> bool:
+        return self.reference.technique == NO_TECHNIQUE
+
+
+@dataclass(frozen=True)
+class Lineup:
+    headlines: tuple[LineupHeadline, LineupHeadline, LineupHeadline]
+
+    @property
+    def techniques(self) -> tuple[str, ...]:
+        return tuple(sorted({h.reference.technique for h in self.headlines}))
+
+    @property
+    def diversity(self) -> int:
+        return len(self.techniques)
+
+    @property
+    def distinct_stories(self) -> bool:
+        return len({h.story_id for h in self.headlines}) == HEADLINES_PER_ROUND
+
+
+def build_lineup(
+    pool: Iterable[LineupHeadline],
+    *,
+    used_techniques: Iterable[str] = (),
+    rng_seed: int | str = "",
+) -> Lineup | None:
+    """Pick three undisputed headlines from three DISTINCT outlets, as varied as possible.
+
+    Hard rules: three different outlets; the lineup contains a ``no_technique`` headline
+    (players always get a clean one to spot), unless the pool has none, in which case only
+    three distinct techniques qualify. Preference, in this order: most distinct reference
+    techniques (best case 1 clean + 2 different techniques = 3); three different stories;
+    most techniques not in ``used_techniques`` (novelty, the techniques of the last daily
+    challenges); most distinct declared leanings; freshest; then a seeded, order-independent
+    hash. Never relabels anything. Returns None when no lineup qualifies.
+    """
+    used = frozenset(used_techniques)
+    seen_ids: set[str] = set()
+    slots: dict[tuple[str, str], list[LineupHeadline]] = defaultdict(list)
+    for headline in pool:
+        if headline.id in seen_ids:
+            raise ValueError(f"duplicate headline id {headline.id!r} in pool")
+        seen_ids.add(headline.id)
+        if headline.reference.disputed:
+            continue
+        slots[(headline.outlet, headline.reference.technique)].append(headline)
+    candidates: list[LineupHeadline] = []
+    for key in sorted(slots):
+        fresh_first = sorted(slots[key], key=lambda h: (-h.published, h.id))
+        candidates.extend(fresh_first[:LINEUP_PER_SLOT])
+    has_clean = any(h.is_clean for h in candidates)
+
+    best_key: tuple | None = None
+    best: tuple[LineupHeadline, ...] | None = None
+    n = len(candidates)
+    for i in range(n):
+        a = candidates[i]
+        for j in range(i + 1, n):
+            b = candidates[j]
+            if b.outlet == a.outlet:
+                continue
+            for k in range(j + 1, n):
+                c = candidates[k]
+                if c.outlet == a.outlet or c.outlet == b.outlet:
+                    continue
+                combo = (a, b, c)
+                techniques = {h.reference.technique for h in combo}
+                if has_clean and NO_TECHNIQUE not in techniques:
+                    continue
+                if not has_clean and len(techniques) < HEADLINES_PER_ROUND:
+                    continue
+                tiebreak = hashlib.sha256(
+                    f"{rng_seed}|{'|'.join(sorted(h.id for h in combo))}".encode()
+                ).hexdigest()
+                key = (
+                    len(techniques),
+                    len({h.story_id for h in combo}),
+                    len(techniques - used),
+                    len({h.leaning for h in combo if h.leaning}),
+                    round(sum(h.published for h in combo), 3),
+                    tiebreak,
+                )
+                if best_key is None or key > best_key:
+                    best_key, best = key, combo
+    if best is None:
+        return None
+    ordered = sorted(best, key=lambda h: h.id)
+    random.Random(f"{rng_seed}|lineup|{'|'.join(h.id for h in ordered)}").shuffle(ordered)
+    return Lineup(headlines=(ordered[0], ordered[1], ordered[2]))
 
 
 def build_round(pool: Iterable[Headline], rng_seed: int | str) -> Round:
