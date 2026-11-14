@@ -2,10 +2,10 @@
   "schema_version": 1,
   "mode": "live",
   "stub_note": null,
-  "run_at": "2026-11-14T19:22:50Z",
+  "run_at": "2026-11-14T21:54:00Z",
   "prompt_version": "v3",
-  "eval_version": "eval_v1",
-  "manifest_sha256": "41ac8ae1691d3aee6338571277267da3a462c6ec27ef06052d41689605b4b12d",
+  "eval_version": "eval_v2",
+  "manifest_sha256": "171bf3476c5916be3babfaf55b20b5e5cdf9a7fe35c3eaeba434de3e2b321aed",
   "core_models": [
     "claude-haiku-5.5",
     "gpt-5.4-nano",
@@ -24,7 +24,7 @@
   "n_errors": 0,
   "sources": {
     "semeval21": {
-      "label": "SemEval-2021 Task 6 (meme texts), eval_v1",
+      "label": "SemEval-2021 Task 6 (meme texts), eval_v2",
       "n": 135,
       "n_total": 135,
       "n_errors": 0,
@@ -549,13 +549,531 @@
         }
       ],
       "human_ceiling": null
+    },
+    "headlines_llm": {
+      "label": "Real news headlines, labelled by one LLM annotator (not human), eval_v2",
+      "n": 70,
+      "n_total": 70,
+      "n_errors": 0,
+      "error_ids": [],
+      "n_per_technique": {
+        "loaded_language": 20,
+        "appeal_to_fear": 3,
+        "exaggeration_minimization": 4,
+        "doubt": 4,
+        "vague_authority": 1,
+        "changing_subject": 1,
+        "no_technique": 37
+      },
+      "n_excluded_out_of_taxonomy": 0,
+      "excluded": null,
+      "accuracy": {
+        "k": 55,
+        "n": 70,
+        "value": 0.7857,
+        "ci": [
+          0.6761,
+          0.8656
+        ]
+      },
+      "macro_f1": {
+        "value": 0.3007,
+        "ci": [
+          0.2297,
+          0.4828
+        ],
+        "ci_method": "percentile bootstrap over examples, 2000 resamples, seed 0",
+        "labels": 7,
+        "labels_averaged": [
+          "loaded_language",
+          "appeal_to_fear",
+          "exaggeration_minimization",
+          "doubt",
+          "vague_authority",
+          "changing_subject",
+          "no_technique"
+        ]
+      },
+      "fpr_no_technique": {
+        "k": 1,
+        "n": 37,
+        "value": 0.027,
+        "ci": [
+          0.0048,
+          0.1382
+        ]
+      },
+      "per_technique": {
+        "loaded_language": {
+          "support": 20,
+          "predicted": 23,
+          "tp": 18,
+          "precision": {
+            "k": 18,
+            "n": 23,
+            "value": 0.7826,
+            "ci": [
+              0.581,
+              0.9034
+            ]
+          },
+          "recall": {
+            "k": 18,
+            "n": 20,
+            "value": 0.9,
+            "ci": [
+              0.699,
+              0.9721
+            ]
+          },
+          "f1": 0.8372
+        },
+        "appeal_to_fear": {
+          "support": 3,
+          "predicted": 0,
+          "tp": 0,
+          "precision": {
+            "k": 0,
+            "n": 0,
+            "value": null,
+            "ci": null
+          },
+          "recall": {
+            "k": 0,
+            "n": 3,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.5615
+            ]
+          },
+          "f1": 0.0
+        },
+        "exaggeration_minimization": {
+          "support": 4,
+          "predicted": 0,
+          "tp": 0,
+          "precision": {
+            "k": 0,
+            "n": 0,
+            "value": null,
+            "ci": null
+          },
+          "recall": {
+            "k": 0,
+            "n": 4,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.4899
+            ]
+          },
+          "f1": 0.0
+        },
+        "doubt": {
+          "support": 4,
+          "predicted": 1,
+          "tp": 1,
+          "precision": {
+            "k": 1,
+            "n": 1,
+            "value": 1.0,
+            "ci": [
+              0.2065,
+              1.0
+            ]
+          },
+          "recall": {
+            "k": 1,
+            "n": 4,
+            "value": 0.25,
+            "ci": [
+              0.0456,
+              0.6994
+            ]
+          },
+          "f1": 0.4
+        },
+        "vague_authority": {
+          "support": 1,
+          "predicted": 0,
+          "tp": 0,
+          "precision": {
+            "k": 0,
+            "n": 0,
+            "value": null,
+            "ci": null
+          },
+          "recall": {
+            "k": 0,
+            "n": 1,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.7935
+            ]
+          },
+          "f1": 0.0
+        },
+        "changing_subject": {
+          "support": 1,
+          "predicted": 0,
+          "tp": 0,
+          "precision": {
+            "k": 0,
+            "n": 0,
+            "value": null,
+            "ci": null
+          },
+          "recall": {
+            "k": 0,
+            "n": 1,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.7935
+            ]
+          },
+          "f1": 0.0
+        },
+        "no_technique": {
+          "support": 37,
+          "predicted": 46,
+          "tp": 36,
+          "precision": {
+            "k": 36,
+            "n": 46,
+            "value": 0.7826,
+            "ci": [
+              0.6443,
+              0.8774
+            ]
+          },
+          "recall": {
+            "k": 36,
+            "n": 37,
+            "value": 0.973,
+            "ci": [
+              0.8618,
+              0.9952
+            ]
+          },
+          "f1": 0.8675
+        }
+      },
+      "confusion_matrix": {
+        "labels": [
+          "loaded_language",
+          "appeal_to_fear",
+          "exaggeration_minimization",
+          "doubt",
+          "vague_authority",
+          "changing_subject",
+          "no_technique"
+        ],
+        "rows": "reference",
+        "columns": "predicted",
+        "matrix": [
+          [
+            18,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2
+          ],
+          [
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            3
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            36
+          ]
+        ]
+      },
+      "span_token_f1": {
+        "mean": 0.3755,
+        "n": 33,
+        "ci": [
+          0.2234,
+          0.527
+        ],
+        "definition": "mean token-F1 over all examples with a technique reference and reference spans, regardless of the predicted technique",
+        "n_skipped_no_reference_spans": 0,
+        "when_technique_correct": {
+          "mean": 0.617,
+          "n": 19,
+          "ci": [
+            0.409,
+            0.8065
+          ]
+        },
+        "ci_method": "percentile bootstrap over examples, 2000 resamples, seed 0"
+      },
+      "by_agreement": [
+        {
+          "level": "3/3",
+          "n": 46,
+          "accuracy": {
+            "k": 40,
+            "n": 46,
+            "value": 0.8696,
+            "ci": [
+              0.7433,
+              0.9388
+            ]
+          }
+        },
+        {
+          "level": "2/3",
+          "n": 23,
+          "accuracy": {
+            "k": 15,
+            "n": 23,
+            "value": 0.6522,
+            "ci": [
+              0.4489,
+              0.8119
+            ]
+          }
+        },
+        {
+          "level": "disputed",
+          "n": 1,
+          "accuracy": {
+            "k": 0,
+            "n": 1,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.7935
+            ]
+          }
+        }
+      ],
+      "flag_policies": [
+        {
+          "policy": "flag_at_2_of_3",
+          "label": "Flag at 2 of 3 or more (default)",
+          "min_agreement": 2,
+          "fpr_no_technique": {
+            "k": 1,
+            "n": 37,
+            "value": 0.027,
+            "ci": [
+              0.0048,
+              0.1382
+            ]
+          },
+          "recall_any_technique": {
+            "k": 23,
+            "n": 33,
+            "value": 0.697,
+            "ci": [
+              0.5266,
+              0.8262
+            ]
+          },
+          "recall_correct_technique": {
+            "k": 19,
+            "n": 33,
+            "value": 0.5758,
+            "ci": [
+              0.4081,
+              0.7276
+            ]
+          }
+        },
+        {
+          "policy": "flag_at_3_of_3",
+          "label": "Flag only at 3 of 3",
+          "min_agreement": 3,
+          "fpr_no_technique": {
+            "k": 0,
+            "n": 37,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.0941
+            ]
+          },
+          "recall_any_technique": {
+            "k": 13,
+            "n": 33,
+            "value": 0.3939,
+            "ci": [
+              0.2468,
+              0.5632
+            ]
+          },
+          "recall_correct_technique": {
+            "k": 11,
+            "n": 33,
+            "value": 0.3333,
+            "ci": [
+              0.1975,
+              0.5039
+            ]
+          }
+        }
+      ],
+      "per_model": [
+        {
+          "model": "claude-haiku-5.5",
+          "n_valid_votes": 70,
+          "n_missing_votes": 0,
+          "accuracy": {
+            "k": 49,
+            "n": 70,
+            "value": 0.7,
+            "ci": [
+              0.5846,
+              0.7946
+            ]
+          },
+          "macro_f1": 0.2145,
+          "fpr_no_technique": {
+            "k": 0,
+            "n": 37,
+            "value": 0.0,
+            "ci": [
+              0.0,
+              0.0941
+            ]
+          }
+        },
+        {
+          "model": "gpt-5.4-nano",
+          "n_valid_votes": 70,
+          "n_missing_votes": 0,
+          "accuracy": {
+            "k": 49,
+            "n": 70,
+            "value": 0.7,
+            "ci": [
+              0.5846,
+              0.7946
+            ]
+          },
+          "macro_f1": 0.3975,
+          "fpr_no_technique": {
+            "k": 8,
+            "n": 37,
+            "value": 0.2162,
+            "ci": [
+              0.1139,
+              0.372
+            ]
+          }
+        },
+        {
+          "model": "deepseek-v4.1-flash",
+          "n_valid_votes": 70,
+          "n_missing_votes": 0,
+          "accuracy": {
+            "k": 57,
+            "n": 70,
+            "value": 0.8143,
+            "ci": [
+              0.7077,
+              0.8881
+            ]
+          },
+          "macro_f1": 0.3111,
+          "fpr_no_technique": {
+            "k": 1,
+            "n": 37,
+            "value": 0.027,
+            "ci": [
+              0.0048,
+              0.1382
+            ]
+          }
+        },
+        {
+          "model": "ensemble",
+          "n_valid_votes": 70,
+          "n_missing_votes": 0,
+          "accuracy": {
+            "k": 55,
+            "n": 70,
+            "value": 0.7857,
+            "ci": [
+              0.6761,
+              0.8656
+            ]
+          },
+          "macro_f1": 0.3007,
+          "fpr_no_technique": {
+            "k": 1,
+            "n": 37,
+            "value": 0.027,
+            "ci": [
+              0.0048,
+              0.1382
+            ]
+          }
+        }
+      ],
+      "human_ceiling": null
     }
   },
   "known_limitations": [
     "SemEval-2021 Task 6 texts are meme captions, not news headlines: a domain shift from the headlines the product is built for.",
     "SemEval-2021 Task 6: no_technique means the upstream annotators marked no propaganda span in the text; it was not separately judged as neutral.",
-    "SemEval-2021 Task 6 (meme texts), eval_v1: 48 texts with two or more of our six techniques were excluded (a single reference label would be arbitrary); 17 texts with only out-of-taxonomy techniques were excluded.",
-    "SemEval-2021 Task 6 (meme texts), eval_v1: small samples for appeal_to_fear n=2, exaggeration_minimization n=8, vague_authority n=2, changing_subject n=4; their per-technique numbers have very wide intervals.",
+    "SemEval-2021 Task 6 (meme texts), eval_v2: 48 texts with two or more of our six techniques were excluded (a single reference label would be arbitrary); 17 texts with only out-of-taxonomy techniques were excluded.",
+    "SemEval-2021 Task 6 (meme texts), eval_v2: small samples for appeal_to_fear n=2, exaggeration_minimization n=8, vague_authority n=2, changing_subject n=4; their per-technique numbers have very wide intervals.",
+    "Real news headlines: the labels come from ONE LLM annotator, not from humans, and there is no second annotator, so label noise is unknown and no human ceiling (Cohen's kappa) exists. The annotator and the ensemble's models are all general-purpose LLMs, so their errors may be correlated and agreement may be overstated.",
+    "Real news headlines: the annotator labelled from the headline text alone, before seeing any ensemble output, but picked the 70 headlines from a random sample of 140, so the set is not a random sample of all news and borderline cases were mostly left out. This is a stopgap until two human annotators label a gold set.",
+    "Real news headlines, labelled by one LLM annotator (not human), eval_v2: small samples for appeal_to_fear n=3, exaggeration_minimization n=4, doubt n=4, vague_authority n=1, changing_subject n=1; their per-technique numbers have very wide intervals.",
     "Public datasets may be part of the models' training data (possible leakage), which can inflate scores.",
     "Techniques outside our six are not measured: texts with only such techniques are excluded, not relabelled as no_technique.",
     "Agreement (3/3, 2/3) is the share of models that voted for the final technique, not a calibrated probability.",

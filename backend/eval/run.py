@@ -63,6 +63,7 @@ SOURCE_LABELS = {
     "semeval23": "SemEval-2023 Task 3 paragraphs",
     "ptc": "PTC sentences (SemEval-2020 Task 11)",
     "gold": "Own headline gold set",
+    "headlines_llm": "Real news headlines, labelled by one LLM annotator (not human)",
 }
 
 SOURCE_NOTES = {
@@ -77,6 +78,22 @@ SOURCE_NOTES = {
         ),
     ],
 }
+
+SOURCE_NOTES["headlines_llm"] = [
+    (
+        "Real news headlines: the labels come from ONE LLM annotator, not from humans, "
+        "and there is no second annotator, so label noise is unknown and no human "
+        "ceiling (Cohen's kappa) exists. The annotator and the ensemble's models are all "
+        "general-purpose LLMs, so their errors may be correlated and agreement may be "
+        "overstated."
+    ),
+    (
+        "Real news headlines: the annotator labelled from the headline text alone, before "
+        "seeing any ensemble output, but picked the 70 headlines from a random sample of "
+        "140, so the set is not a random sample of all news and borderline cases were "
+        "mostly left out. This is a stopgap until two human annotators label a gold set."
+    ),
+]
 
 GENERAL_NOTES = [
     (
