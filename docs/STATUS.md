@@ -6,13 +6,13 @@ _Updated: 2026-11-14 by the orchestrator_
 
 | # | Stage | Status | Notes |
 |---|---|---|---|
-| 0 | Infrastructure and deployment skeleton | in progress | VPS rebooted 2026-11-14, all containers back, public URL 200. Foundation committed (`397a424`). Dockerfile/compose/runbook: agent working |
-| 1 | Datasets and gold set | in progress | PTC dropped (no registration). SemEval-2021 Task 6 downloaded to `data/raw/` (public, research use). Converter, dev set and eval candidate: agent working. Eval not frozen |
-| 2 | Core ensemble classifier | in progress | stub + aggregation + client with mocked tests: agent working. Live calls not approved yet |
-| 3 | /metrics page | in progress | UI in mock mode: agent working |
-| 4 | Game | in progress | pure logic: agent working; UI in mock mode: agent working |
-| 5 | Analyze mode | in progress | UI in mock mode: agent working |
-| 6 | Real news (RSS) | in progress | fetch + clustering + dry run: agent working; DB integration waits for api-backend |
+| 0 | Infrastructure and deployment skeleton | in progress | VPS rebooted, public URL 200. Foundation, Dockerfile, compose (labels only, Traefik in host network mode), deploy scripts with `--confirm`, runbook committed. First app deploy waits for the API and the user's yes. Docker is not installed in WSL, so no local image build |
+| 1 | Datasets and gold set | in progress | SemEval-2021 Task 6: dev 527 + multi 142 + few-shot 14 committed; **eval_v1 frozen** (135). Gold set of real headlines not started (needs two annotators). Few-shot needs a human review (5 weak picks of 14) |
+| 2 | Core ensemble classifier | done | committed; prompt v3. Models verified 2026-11-14 via GET /models: gpt-5.5, claude-sonnet-5.5, deepseek-v4.1-flash. One live call on a dev example: 3 of 3, exact spans |
+| 3 | /metrics page | in progress | eval runner: agent working; live eval run by the orchestrator after review; UI in mock mode: agent working |
+| 4 | Game | in progress | logic committed; UI in mock mode: agent working; API next |
+| 5 | Analyze mode | in progress | UI in mock mode: agent working; API next |
+| 6 | Real news (RSS) | in progress | fetch + clustering + offline dry run committed; feeds not fetched live yet; DB integration waits for api-backend |
 | 7 | Disputes and human vs model | todo | |
 | 8 | Final | todo | |
 
@@ -20,12 +20,12 @@ Statuses: todo · in progress · done · blocked · cut
 
 ## Tasks in progress
 
-Phase B, parallel: core-classifier, game-logic, news-pipeline (pure parts), frontend-builder (mock mode), infra-deployer (local files), data-curator (SemEval-2021 Task 6).
+frontend-builder (mock mode, phase B); eval-metrics (phase C). Next: api-backend (after the frontend's mock shapes), then news DB integration and invariant-guard.
 
 ## Needed from the human
 
-- [ ] Approve freezing `eval_v1` from the SemEval-2021 Task 6 test split (after the candidate is reviewed).
-- [ ] Approve live model calls through AI Router (key is in `.env`).
+- [ ] Review `data/dev/fewshot.jsonl` (14 examples; some are offensive meme texts or weak labels).
+- [ ] Before the first app deploy: yes to stop the hello-world (same Host rule) and create `/opt/spotthespin/app/.env` (mode 600) on the server.
 - [ ] Find a second annotator for the gold set (postponed).
 - [ ] Later: Hermes port 32768 and passwordless sudo for `deploy` (postponed).
 
@@ -35,7 +35,7 @@ Phase B, parallel: core-classifier, game-logic, news-pipeline (pure parts), fron
 
 ## Frozen test set
 
-- None yet. Candidate in `data/staging/eval_v1_candidate/` (gitignored) until the user approves the freeze.
+- `data/eval/eval_v1/` — SemEval-2021 Task 6 test split, 135 examples (41 no_technique, 68 loaded_language, 10 doubt, 8 exaggeration_minimization, 4 changing_subject, 2 appeal_to_fear, 2 vague_authority). `semeval21_test.jsonl` sha256 `1e07d6907c0e5f91ae26a29c7bbb42871aab5272fcfb5c143841102fd26da91d`. Frozen 2026-11-14 on the user's approval, commit `aa60f70`, before any prompt tuning. Suggested tag: `eval_v1`.
 
 ## Decision log
 
@@ -51,3 +51,7 @@ Phase B, parallel: core-classifier, game-logic, news-pipeline (pure parts), fron
 - 2026-11-14 — VPS rebooted after updates by user decision; Traefik, Hermes and hello-world came back on their own.
 - 2026-11-14 — PTC dropped: it needs registration and the authors forbid automatic download; unofficial mirrors are not used. Replaced by SemEval-2021 Task 6 (public repo by the authors, "free for general research use"). Mapping and multi-label rules in `docs/KNOWLEDGE_BASE.md`. Upstream test split = eval candidate; upstream train+dev = dev.
 - 2026-11-14 — User allowed commits without push; every push still needs an explicit yes.
+- 2026-11-14 — eval_v1 frozen from the SemEval-2021 Task 6 test split by user decision (small n and meme-domain shift accepted, shown on /metrics).
+- 2026-11-14 — `vague_authority` broadened to "appeal to authority" (named or unnamed) by user decision, to match the SemEval label; id kept; prompt bumped to v3. Decided after the freeze, from dev examples only.
+- 2026-11-14 — Live model calls approved by the user: model check and the eval_v1 run.
+- 2026-11-14 — Game tokenizer keeps hyphenated words as one token (keeps the plan's worked example at 87). Disputed references are not used in rounds. Cache key includes a hash of the few-shot examples.
