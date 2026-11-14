@@ -36,6 +36,8 @@ secrets
 **/id_rsa*
 **/id_ed25519*
 backend/tests
+backend/eval/results/*-predictions.jsonl
+backend/eval/results/stub
 **/__pycache__
 **/*.pyc
 .venv

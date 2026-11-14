@@ -11,7 +11,8 @@ junction_2026/
 │   │   ├── core/          # the ONE classifier: prompt, model clients, aggregation, cache
 │   │   ├── api/           # FastAPI routers: /api/analyze, /api/round, /api/answer, /api/dispute, /api/metrics
 │   │   ├── game/          # round assembly, scoring (60 + 40 × token-F1)
-│   │   ├── news/          # RSS fetch, event clustering, round-of-the-day job
+│   │   ├── news/          # RSS fetch, event clustering, daily job (daily.py): label, store rounds, pick the daily challenge
+│   │   ├── scheduler.py   # in-process 00:00 scheduler (DAILY_* settings), idempotent per date via job_runs
 │   │   └── db.py          # SQLite: rounds, answers, disputes
 │   ├── eval/              # eval runner + metric functions → results JSON
 │   └── tests/
@@ -66,6 +67,8 @@ Rules attached to the contract:
 - The app serves `GET /health` and `GET /api/health` (both 200 when the process is up); the container health check accepts either.
 - Traefik on the VPS runs in host network mode, so the app compose needs no shared Docker network: labels only, like the hello-world.
 - The image contains `backend/`, `frontend/` and `data/dev/` (few-shot at runtime). `data/eval/`, `data/raw/` and all secrets stay out of the image.
+
+SQLite tables (`app/db.py`): `rounds` (with `n_outlets`), `round_items`, `answers`, `disputes`, `dispute_votes`, `daily_challenge` (one round per local date), `job_runs` (one row per local date; the idempotency guard of the daily job).
 
 ## Game rules attached to the contract
 

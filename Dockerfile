@@ -45,6 +45,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DB_PATH=/app/var/app.db \
     HEALTHCHECK_PATHS="/health /api/health"
 
+# tzdata: the daily job schedules at 00:00 in DAILY_TZ (zoneinfo needs system data here).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --home-dir /app --no-create-home \
        --shell /usr/sbin/nologin app
@@ -63,7 +68,13 @@ COPY --chown=app:app . /app/
 # not /app/data: a volume there would hide the data/dev/ shipped in each new
 # image behind the copy made on first start. Creating it here with the right
 # owner makes a fresh volume writable by the non-root user.
-RUN mkdir -p /app/var && chown app:app /app/var
+#
+# The paid verdict cache (data/cache) must be writable and survive redeploys, so it
+# lives in the volume too: /app/data/cache is a symlink to /app/var/cache.
+RUN mkdir -p /app/var/cache \
+    && ln -s /app/var/cache /app/data/cache \
+    && chown -R app:app /app/var \
+    && chown -h app:app /app/data/cache
 
 USER app
 

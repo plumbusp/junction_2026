@@ -9,10 +9,10 @@ _Updated: 2026-11-14 by the orchestrator_
 | 0 | Infrastructure and deployment skeleton | in progress | VPS rebooted, public URL 200. Foundation, Dockerfile, compose (labels only, Traefik in host network mode), deploy scripts with `--confirm`, runbook committed. First app deploy waits for the API and the user's yes. Docker is not installed in WSL, so no local image build |
 | 1 | Datasets and gold set | in progress | SemEval-2021 Task 6: dev 527 + multi 142 + few-shot 14 committed; **eval_v1 frozen** (135). Gold set of real headlines not started (needs two annotators). Few-shot needs a human review (5 weak picks of 14) |
 | 2 | Core ensemble classifier | done | committed; prompt v3. Models verified 2026-11-14 via GET /models: gpt-5.5, claude-sonnet-5.5, deepseek-v4.1-flash. One live call on a dev example: 3 of 3, exact spans |
-| 3 | /metrics page | in progress | eval runner: agent working; live eval run by the orchestrator after review; UI in mock mode: agent working |
-| 4 | Game | in progress | logic committed; UI in mock mode: agent working; API next |
-| 5 | Analyze mode | in progress | UI in mock mode: agent working; API next |
-| 6 | Real news (RSS) | in progress | fetch + clustering + offline dry run committed; feeds not fetched live yet; DB integration waits for api-backend |
+| 3 | /metrics page | done | live eval_v1 run committed (`33ae24c`); page redesigned as a case file; per-model details only inside "Methodology" |
+| 4 | Game | done (local) | logic + API + redesigned UI (cork board, one-screen examine, radio music); product name "no i am not brainwashed" |
+| 5 | Analyze mode | done (local) | `POST /api/analyze` with SSRF guard and rate limit; page restyled |
+| 6 | Real news (RSS) | in progress | fetch, cluster, label (live), store rounds, daily challenge with in-process scheduler at 00:00 (`DAILY_TZ`, default Europe/Helsinki) and `job_runs` idempotency. 12 feeds verified by plain GETs on 2026-11-14. Not yet run live with models |
 | 7 | Disputes and human vs model | todo | |
 | 8 | Final | todo | |
 
@@ -54,4 +54,9 @@ frontend-builder (mock mode, phase B); eval-metrics (phase C). Next: api-backend
 - 2026-11-14 — eval_v1 frozen from the SemEval-2021 Task 6 test split by user decision (small n and meme-domain shift accepted, shown on /metrics).
 - 2026-11-14 — `vague_authority` broadened to "appeal to authority" (named or unnamed) by user decision, to match the SemEval label; id kept; prompt bumped to v3. Decided after the freeze, from dev examples only.
 - 2026-11-14 — Live model calls approved by the user: model check and the eval_v1 run.
+- 2026-11-14 — User approved push, deploy and live news collection. Product renamed to "no i am not brainwashed". Daily challenge at 00:00 every day; timezone default Europe/Helsinki is the orchestrator's guess, configurable via `DAILY_TZ`.
+- 2026-11-14 — Feeds: HuffPost (empty feed) and WSJ (frozen) dropped, Slate added (declared leaning is an AllSides-style approximation, to be reviewed). New DB objects: `rounds.n_outlets`, `daily_challenge`, `job_runs`.
+- 2026-11-14 — UI no longer shows "3 of 3 models" wording: confidence is High / Moderate / Disputed; the ensemble description and model IDs live only in /metrics "Methodology".
+- 2026-11-14 — invariant-guard gate: OK. The English-only rule does not apply to upstream corpus records: a few SemEval meme texts contain Cyrillic (including one frozen eval record, which must not be edited). The per-example predictions file stays in git but is excluded from the Docker image.
+- 2026-11-14 — Verdict cache moved into the Docker volume (`/app/var/cache`, symlinked from `/app/data/cache`) so the paid cache survives redeploys; image installs `tzdata`.
 - 2026-11-14 — Game tokenizer keeps hyphenated words as one token (keeps the plan's worked example at 87). Disputed references are not used in rounds. Cache key includes a hash of the few-shot examples.

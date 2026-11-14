@@ -60,6 +60,8 @@ Do these on the VPS as user `deploy`, after the user confirms. None of them is d
    nano /opt/spotthespin/app/.env
    ```
    Variable names (values are typed on the server, never pasted into chat or the repo): `CORE_MODE`, `CORE_MODELS`, `AI_ROUTER_BASE_URL`, `AI_ROUTER_API_KEY`, `PUBLIC_DOMAIN`. `DB_PATH` is fixed by the compose file (`/app/var/app.db`); do not set it here.
+
+   Daily challenge variables (all optional except `DAILY_JOB_ENABLED=true` to switch it on): `DAILY_JOB_ENABLED` (default false), `DAILY_JOB_HOUR` / `DAILY_JOB_MINUTE` (default 0 / 0), `DAILY_TZ` (default `Europe/Helsinki`, a guess; set the team's zone), `DAILY_MAX_CLUSTERS` (5), `DAILY_MAX_HEADLINES` (24, the paid cap: headlines x 3 models per day), `DAILY_TZ_FALLBACK_OFFSET_MINUTES` (120, used only if tz data is missing; the image installs `tzdata`).
 4. **SSH from WSL.** `deploy.sh` runs in WSL and uses `ssh deploy@srv2160832.hstgr.cloud`. If the key is not in WSL's `~/.ssh` or agent, pass it: `DEPLOY_SSH_OPTS="-i /path/to/key"`. The key itself stays on the personal machine.
 
 ## Before every deploy
@@ -89,6 +91,19 @@ Before a redeploy that changes the database schema, take a backup:
 docker exec spotthespin-app-1 python -c "import sqlite3; sqlite3.connect('/app/var/app.db').backup(sqlite3.connect('/app/var/backup.db'))"
 docker cp spotthespin-app-1:/app/var/backup.db /opt/spotthespin/app/backups/app-$(date +%F-%H%M).db
 ```
+
+## Daily challenge
+
+With `DAILY_JOB_ENABLED=true` the app starts an in-process scheduler (single uvicorn worker). Every day at `DAILY_JOB_HOUR:DAILY_JOB_MINUTE` in `DAILY_TZ` it fetches the RSS feeds, clusters events, labels the best clusters with the live ensemble, stores them as rounds and designates one as that date's challenge. It runs once per local date (`job_runs` table), also across restarts; if the container starts after the scheduled time with no run for today, it catches up once in the background. A failed day does not break `/api/round`: it falls back to the newest unfinished round.
+
+`scripts/` is not in the image. Run it by hand inside the container:
+
+```
+docker exec spotthespin-app-1 python -m app.news.daily            # respects "already done today"
+docker exec spotthespin-app-1 python -m app.news.daily --force    # re-run for today (reuses cached verdicts)
+```
+
+The paid verdict cache lives in the volume (`/app/var/cache`, linked from `/app/data/cache`), so redeploys do not re-pay for labelled headlines. Check the run: `docker exec spotthespin-app-1 python -c "import sqlite3;print(sqlite3.connect('/app/var/app.db').execute('select * from job_runs order by 1 desc limit 3').fetchall())"` (counts only, no headline text).
 
 ## Rollback
 
