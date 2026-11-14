@@ -1,0 +1,24 @@
+[project]
+name = "spot-the-spin"
+version = "0.1.0"
+description = "Spot the Spin: propaganda-technique detection game and analysis tool (Junction 2026)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pydantic",
+    "python-dotenv",
+    "feedparser",
+    "trafilatura",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]
