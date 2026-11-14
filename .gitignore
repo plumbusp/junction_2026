@@ -19,6 +19,9 @@ node_modules/
 
 # --- data and databases ---
 data/raw/
+data/news/
+data/cache/
+data/staging/
 *.db
 *.sqlite3
 

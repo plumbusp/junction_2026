@@ -66,7 +66,7 @@ Rules attached to the contract:
 `data/dev/*.jsonl` and `data/eval/<version>/*.jsonl`, one example per line:
 
 ```json
-{"id": "ptc-123-4", "source": "ptc|gold|semeval23", "text": "...", "technique": "appeal_to_fear", "evidence_spans": ["drown", "gridlock"]}
+{"id": "ptc-123-4", "source": "ptc|gold|semeval21|semeval23", "text": "...", "technique": "appeal_to_fear", "evidence_spans": ["drown", "gridlock"]}
 ```
 
 Eval results JSON (written by `backend/eval`, read by the /metrics page) is keyed by source; each entry holds `n`, per-technique P/R/F1 with Wilson intervals, macro-F1, FPR on no_technique, confusion matrix, span token-F1, accuracy by agreement level, per-model results.

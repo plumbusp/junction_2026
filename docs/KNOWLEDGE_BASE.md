@@ -47,6 +47,26 @@ Six techniques from the team's presentation, plus "no technique". This is our ow
 
 PTC techniques outside our six (Flag-Waving, Slogans, Repetition and others) are **excluded** from evaluation, not labelled as "no technique".
 
+### SemEval-2021 Task 6 mapping (source `semeval21`)
+
+| Ours | SemEval-2021 Task 6 labels |
+|---|---|
+| `loaded_language` | Loaded Language, Name calling/Labeling |
+| `appeal_to_fear` | Appeal to fear/prejudice |
+| `exaggeration_minimization` | Exaggeration/Minimisation |
+| `doubt` | Doubt |
+| `vague_authority` | Appeal to authority |
+| `changing_subject` | Whataboutism, Misrepresentation of Someone's Position (Straw Man), Presenting Irrelevant Data (Red Herring) |
+| out of taxonomy | Smears, Slogans, Glittering generalities (Virtue), Flag-waving, Causal Oversimplification, Repetition, Thought-terminating cliché, Black-and-white Fallacy/Dictatorship, Reductio ad hitlerum, Obfuscation/Intentional vagueness/Confusion, Bandwagon |
+
+Labelling rules for a meme text (texts are multi-label):
+- no labels at all: `no_technique`;
+- exactly one of our techniques after mapping (other labels may be out of taxonomy): that technique; evidence = spans of the mapped labels only;
+- two or more of our techniques: excluded from evaluation (a single reference label would be arbitrary); allowed in dev;
+- only out-of-taxonomy labels: excluded everywhere, not relabelled as `no_technique`.
+
+Counts on the upstream test split (n=200): 41 no technique, 94 single technique (76 of them `loaded_language`), 48 multi-technique, 17 out of taxonomy only. Rare techniques have n of 1 to 4 in test; their per-technique numbers are reported with that caveat, not hidden. Meme texts are a domain shift from news headlines; state it under "Known limitations".
+
 ## 4. Review comments (the team's slide)
 
 1. There is no /metrics page. It is about 40% of the score and the top priority.
@@ -62,7 +82,7 @@ PTC techniques outside our six (Flag-Waving, Slogans, Repetition and others) are
 |---|---|---|
 | PTC, SemEval-2020 Task 11 | news articles, span-level labels, 14 techniques | registration required: propaganda.qcri.org/ptc/registration.php. Status not confirmed |
 | SemEval-2023 Task 3 (subtask 3) | English news paragraphs, ~19 techniques | registration open. Status not confirmed |
-| SemEval-2021 Task 6 | meme texts, 22 techniques | availability not verified |
+| SemEval-2021 Task 6 | meme texts, 22 techniques, span labels; 688 train / 63 dev / 200 test, gold test labels public | **available without registration**: github.com/di-dimitrov/SEMEVAL-2021-task6-corpus, licence "free for general research use". Downloaded 2026-11-14 to `data/raw/semeval2021_task6/` (gitignored, not committed). Source tag `semeval21` |
 | Own gold set of real headlines | 150–200 headlines from RSS, labelled by two people | **not created**. The repository has no `data/` yet |
 
 Important: the repository has no `data/eval/` yet. There is no frozen test set; it has to be created and frozen before prompt tuning.
