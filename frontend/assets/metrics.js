@@ -202,7 +202,7 @@ function renderPerModel(key, src) {
   const models = src.per_model || [];
   if (!models.length) return null;
   const rows = models.map((m) => el("tr", {},
-    el("th", { scope: "row", text: m.model === "ensemble" ? "Ensemble (majority of 3)" : m.model }),
+    el("th", { scope: "row", text: m.model === "ensemble" ? "Ensemble (3 of 3 to accuse)" : m.model }),
     propCells(m.accuracy, `${m.model} accuracy`),
     el("td", { class: "num", text: num(typeof m.macro_f1 === "object" && m.macro_f1 ? m.macro_f1.value : m.macro_f1) }),
     propCells(m.fpr_no_technique, `${m.model} FPR`)));

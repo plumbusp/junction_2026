@@ -101,8 +101,8 @@
 
     <details id="methodology" class="paper sheet methodology">
       <summary><h2 id="h-methodology">Methodology</h2></summary>
-      <p>The classifier is an ensemble of three different large language models from different vendors. Each model labels the text independently with the same prompt; the reference answer is the majority vote. Confidence is the agreement level: <strong>High confidence</strong> when all three agree, <strong>Moderate confidence</strong> when two of three agree, and <strong>Disputed</strong> when no two agree. Agreement is not a probability, and models from the same era can share the same blind spots, so agreement can be confidently wrong.</p>
-      <p>Flagging policies: by default a text is flagged when at least two of three models name a technique; the stricter policy needs all three.</p>
+      <p>The classifier is an ensemble of three different large language models from different vendors. Each model labels the text independently with the same prompt; a text is accused of a technique only when <strong>all three</strong> models name it. When only two of three see a technique, the text is not accused and is shown as <strong>Disputed</strong>, with the near-miss explained. Two of three saying "no technique" is a clean verdict. Agreement is not a probability, and models from the same era can share the same blind spots, so agreement can be confidently wrong.</p>
+      <p>Flagging policies: by default a text is flagged only when all three models name a technique (precision first: a false accusation costs more than a miss). The table also shows the looser two-of-three rule, computed from the same votes, so the trade-off is visible.</p>
       <p id="methodology-models" class="typewriter small"></p>
       <div id="methodology-per-model"></div>
     </details>

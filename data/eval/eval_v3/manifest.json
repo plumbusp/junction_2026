@@ -1,0 +1,112 @@
+{
+  "source": "semeval21",
+  "upstream": "SemEval-2021 Task 6, subtask 2",
+  "upstream_url": "https://github.com/di-dimitrov/SEMEVAL-2021-task6-corpus",
+  "licence": "free for general research use",
+  "mapping": "docs/KNOWLEDGE_BASE.md, section 3, 'SemEval-2021 Task 6 mapping'",
+  "generator": "scripts/data/semeval21_convert.py",
+  "seed": 20211,
+  "date": "2026-11-14",
+  "status": "FROZEN. eval_v2 files (unchanged, byte-identical) plus ptc_headlines. Do not modify; a change means eval_v4.",
+  "upstream_split": "test",
+  "inputs": {
+    "test": {
+      "file": "test_set_task2.txt",
+      "sha256": "a984fdb8645713e0ea9c937f8c3fc76b8cd9e292db48e44ae64d0bfc0ffed914"
+    }
+  },
+  "n_upstream": 200,
+  "n_written": 135,
+  "counts_per_technique": {
+    "semeval21_test.jsonl": {
+      "loaded_language": 68,
+      "appeal_to_fear": 2,
+      "exaggeration_minimization": 8,
+      "doubt": 10,
+      "vague_authority": 2,
+      "changing_subject": 4,
+      "no_technique": 41
+    },
+    "headlines_llm.jsonl": {
+      "exaggeration_minimization": 4,
+      "no_technique": 37,
+      "appeal_to_fear": 3,
+      "loaded_language": 20,
+      "changing_subject": 1,
+      "vague_authority": 1,
+      "doubt": 4
+    },
+    "ptc_headlines.jsonl": {
+      "no_technique": 250,
+      "loaded_language": 67,
+      "doubt": 7,
+      "vague_authority": 1,
+      "exaggeration_minimization": 3,
+      "appeal_to_fear": 3,
+      "changing_subject": 1
+    }
+  },
+  "excluded_by_reason": {
+    "multi_technique": 48,
+    "out_of_taxonomy_only": 17
+  },
+  "spans": {
+    "mapped_label_spans": 299,
+    "repaired_from_text_fragment": 2,
+    "dropped_not_in_text": 0,
+    "dropped_in_ids": [],
+    "out_of_taxonomy_spans_not_in_text": 2
+  },
+  "files": {
+    "ptc_headlines.jsonl": {
+      "sha256": "fb4f7287158a7344992f6d3766d0cbc0b26cc5643c3554061a145e56172aa042",
+      "n": 332
+    },
+    "semeval21_test.jsonl": {
+      "sha256": "1e07d6907c0e5f91ae26a29c7bbb42871aab5272fcfb5c143841102fd26da91d",
+      "n": 135
+    },
+    "headlines_llm.jsonl": {
+      "sha256": "c5fec8d95e24f7c4905513ffe03d88072989455e196f0c8f31722fe9d1b00c1a",
+      "n": 70
+    }
+  },
+  "version": "eval_v3",
+  "frozen_date": "2026-11-15",
+  "frozen_by": "project team, by explicit decision",
+  "extra_sources": {
+    "headlines_llm": {
+      "what": "70 real news headlines (titles only) from 35 outlets' RSS feeds, fetched 2026-11-14",
+      "annotator": "ONE LLM annotator. NOT human annotation; no second annotator; no kappa.",
+      "protocol": "Labels were decided from the headline text alone, before any ensemble output on these headlines was seen. Headlines were picked by the annotator from a random sample of 140 (4 random per outlet), so the set is not a random sample of all news and several borderline cases were left out.",
+      "caveats": [
+        "The annotator and the ensemble's models are all general-purpose LLMs: errors may be correlated.",
+        "Single annotator: label noise is unknown; some calls are borderline.",
+        "Replace or supplement with two human annotators when available."
+      ]
+    },
+    "ptc_headlines": {
+      "what": "332 real news article titles from the Propaganda Techniques Corpus (PTC), SemEval-2020 Task 11 train split (articles from 2017-2019, mainstream and partisan outlets)",
+      "upstream_url": "https://zenodo.org/records/3952415",
+      "upstream_file": {
+        "file": "datasets-v2.tgz",
+        "sha256": "fd2d2c358d42b2e326e7f6f148007b384f0a0ffac5ab6db21e3889313a8516bb"
+      },
+      "licence": "CC-BY-4.0 (Da San Martino et al., 2019/2020)",
+      "annotator": "HUMAN: professional annotators, span-level, consolidated by the upstream authors.",
+      "generator": "scripts/data/ptc_headlines_convert.py",
+      "protocol": "Every train-article title, no sampling. no_technique = no propaganda span overlaps the title; one mapped technique = that technique; two or more of ours, or out-of-taxonomy only = excluded; duplicate titles kept once.",
+      "excluded_by_reason": {
+        "out_of_taxonomy_only": 15,
+        "multi_technique": 13,
+        "duplicate_title": 11
+      },
+      "leakage": "No PTC text is in data/dev or the prompt anchors (content-word overlap check: 0 hits). PTC was never used for prompt tuning.",
+      "caveats": [
+        "Titles are annotated as part of the whole article; no_technique means annotators marked no span in the title, not a separate neutrality judgement.",
+        "Articles are from 2017-2019, so topics differ from today's RSS headlines.",
+        "Rare techniques have tiny supports (1-7); per-technique numbers for them are not meaningful."
+      ]
+    }
+  }
+}

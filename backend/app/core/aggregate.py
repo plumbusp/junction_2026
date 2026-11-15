@@ -13,6 +13,24 @@ DISAGREEMENT_EXPLANATION = (
     "The models disagreed about this text, so no confident verdict is given."
 )
 GENERIC_EXPLANATION = "Most models agreed on this technique but gave no explanation."
+# A text is accused of a technique only when this many models name it (precision first:
+# a false accusation costs more than a miss). Chosen on dev data, see docs/STATUS.md.
+ACCUSE_MIN_VOTES = 3
+LABELS = {
+    "loaded_language": "loaded language",
+    "appeal_to_fear": "appeal to fear",
+    "exaggeration_minimization": "exaggeration or minimization",
+    "doubt": "doubt",
+    "vague_authority": "appeal to authority",
+    "changing_subject": "changing the subject",
+}
+
+
+def not_enough_explanation(label: str, count: int, n_models: int, needed: int) -> str:
+    return (
+        f"{count} of {n_models} models saw {LABELS.get(label, label)} here, but a text is "
+        f"flagged only when {needed} of {n_models} agree, so this one is not accused."
+    )
 
 
 def validate_spans(text: str, spans: list[str]) -> list[str]:
@@ -27,11 +45,15 @@ def validate_spans(text: str, spans: list[str]) -> list[str]:
     return kept
 
 
-def aggregate(votes: list[ModelVote], n_models: int) -> Verdict:
+def aggregate(
+    votes: list[ModelVote], n_models: int, min_accuse: int = ACCUSE_MIN_VOTES
+) -> Verdict:
     """Combine successful votes into one Verdict.
 
     - technique: the label with the most votes, if it has at least 2 votes and no tie;
-      otherwise ``no_technique`` with ``disputed=True``;
+      otherwise ``no_technique`` with ``disputed=True``. A technique (not ``no_technique``)
+      also needs ``min_accuse`` votes (default ``ACCUSE_MIN_VOTES``); with fewer the verdict is ``no_technique``
+      with ``disputed=True`` and an explanation naming the near-miss;
     - evidence_spans: spans chosen by at least 2 of the models that voted for the final
       technique (empty when there is no majority);
     - explanation: from a model in the majority, or a neutral sentence on disagreement;
@@ -58,6 +80,17 @@ def aggregate(votes: list[ModelVote], n_models: int) -> Verdict:
             technique="no_technique",
             evidence_spans=[],
             explanation=DISAGREEMENT_EXPLANATION,
+            agreement=counts.get("no_technique", 0),
+            n_models=n_models,
+            disputed=True,
+            votes=list(votes),
+        )
+
+    if top_label != "no_technique" and top_count < min_accuse:
+        return Verdict(
+            technique="no_technique",
+            evidence_spans=[],
+            explanation=not_enough_explanation(top_label, top_count, n_models, min_accuse),
             agreement=counts.get("no_technique", 0),
             n_models=n_models,
             disputed=True,

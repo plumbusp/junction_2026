@@ -64,6 +64,7 @@ SOURCE_LABELS = {
     "ptc": "PTC sentences (SemEval-2020 Task 11)",
     "gold": "Own headline gold set",
     "headlines_llm": "Real news headlines, labelled by one LLM annotator (not human)",
+    "ptc_headlines": "Real news headlines, human-annotated (PTC, SemEval-2020 Task 11)",
 }
 
 SOURCE_NOTES = {
@@ -92,6 +93,20 @@ SOURCE_NOTES["headlines_llm"] = [
         "seeing any ensemble output, but picked the 70 headlines from a random sample of "
         "140, so the set is not a random sample of all news and borderline cases were "
         "mostly left out. This is a stopgap until two human annotators label a gold set."
+    ),
+]
+
+SOURCE_NOTES["ptc_headlines"] = [
+    (
+        "PTC headlines: titles of 2017-2019 news articles annotated span by span by "
+        "professional annotators (Da San Martino et al., CC-BY-4.0). Every train-article "
+        "title is used, no sampling; PTC was never used for prompt tuning."
+    ),
+    (
+        "PTC headlines: no_technique means the annotators marked no propaganda span in the "
+        "title, not a separate neutrality judgement. Titles were annotated inside the whole "
+        "article and some clearly loaded titles carry no span, so part of the false "
+        "positives here may be label noise."
     ),
 ]
 

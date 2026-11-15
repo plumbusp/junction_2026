@@ -19,8 +19,8 @@ DISPUTED = "disputed"
 
 # Policy id, label for the page, minimum agreement for a technique verdict to be flagged.
 FLAG_POLICIES = [
-    ("flag_at_2_of_3", "Flag at 2 of 3 or more (default)", 2),
-    ("flag_at_3_of_3", "Flag only at 3 of 3", 3),
+    ("flag_at_2_of_3", "Flag at 2 of 3 or more", 2),
+    ("flag_at_3_of_3", "Flag only at 3 of 3 (default)", 3),
 ]
 
 
@@ -57,14 +57,27 @@ def by_agreement(results: Sequence[ItemResult], n_models: int = 3) -> list[dict]
     ]
 
 
+def flagged_technique(result: ItemResult, min_agreement: int) -> str | None:
+    """The technique a rule would flag: the top vote, if it is a technique with at least
+    ``min_agreement`` votes and no tie. Computed from the raw votes, so every rule can be
+    measured whatever rule the live ensemble uses."""
+    counts: dict[str, int] = {}
+    for vote in result.verdict.votes:
+        counts[vote.technique] = counts.get(vote.technique, 0) + 1
+    if not counts:
+        return None
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])
+    label, top = ranked[0]
+    if len(ranked) > 1 and ranked[1][1] == top:
+        return None
+    if label == NO_TECHNIQUE or top < max(2, min_agreement):
+        return None
+    return label
+
+
 def is_flagged(result: ItemResult, min_agreement: int) -> bool:
-    """True when the ensemble names a technique with at least ``min_agreement`` votes."""
-    verdict = result.verdict
-    return (
-        verdict.technique != NO_TECHNIQUE
-        and not verdict.disputed
-        and verdict.agreement >= min_agreement
-    )
+    """True when the rule flags any technique for this text."""
+    return flagged_technique(result, min_agreement) is not None
 
 
 def flag_policies(results: Sequence[ItemResult]) -> list[dict]:
@@ -81,7 +94,7 @@ def flag_policies(results: Sequence[ItemResult]) -> list[dict]:
         flagged_clean = sum(is_flagged(r, min_agreement) for r in clean)
         flagged_any = sum(is_flagged(r, min_agreement) for r in manipulated)
         flagged_right = sum(
-            is_flagged(r, min_agreement) and r.verdict.technique == r.item.reference
+            flagged_technique(r, min_agreement) == r.item.reference
             for r in manipulated
         )
         out.append(

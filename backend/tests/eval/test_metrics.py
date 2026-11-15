@@ -57,7 +57,7 @@ def toy_results() -> list[ItemResult]:
             for j, (t, s) in enumerate(votes, 1)
         ]
         item = EvalItem(f"toy-{i}", "toy", f"text {i}", ref, tuple(ref_spans))
-        results.append(ItemResult(item, aggregate(model_votes, n_models=3)))
+        results.append(ItemResult(item, aggregate(model_votes, n_models=3, min_accuse=2)))
     return results
 
 

@@ -47,10 +47,11 @@ def test_majority_win_through_mocked_router(tmp_path: Path) -> None:
 
     verdict = run(router, tmp_path)
 
-    assert verdict.technique == "loaded_language"
-    assert (verdict.agreement, verdict.n_models, verdict.disputed) == (2, 3, False)
-    assert verdict.evidence_spans == ["slams"]
-    assert verdict.explanation == "Charged words."
+    # 2 of 3 is a near-miss: not accused under the 3-of-3 rule, but the votes are kept.
+    assert verdict.technique == "no_technique"
+    assert (verdict.agreement, verdict.n_models, verdict.disputed) == (0, 3, True)
+    assert verdict.evidence_spans == []
+    assert "2 of 3 models saw loaded language" in verdict.explanation
     assert [v.model for v in verdict.votes] == ["model-a", "model-b", "model-c"]
 
 
@@ -82,12 +83,13 @@ def test_malformed_json_discards_one_vote(tmp_path: Path) -> None:
     verdict = run(router, tmp_path)
 
     assert [v.model for v in verdict.votes] == ["model-a", "model-c"]
+    # Two usable votes cannot reach the 3-of-3 accusation rule.
     assert (verdict.technique, verdict.agreement, verdict.disputed) == (
-        "appeal_to_fear",
-        2,
-        False,
+        "no_technique",
+        0,
+        True,
     )
-    assert verdict.evidence_spans == ["gridlock"]
+    assert "2 of 3 models saw appeal to fear" in verdict.explanation
 
 
 def test_unknown_technique_discards_vote_and_log_has_no_model_text(
@@ -120,7 +122,8 @@ def test_model_timing_out_is_excluded_after_one_retry(tmp_path: Path) -> None:
 
     assert router.calls["model-b"] == 2  # first attempt + one retry
     assert [v.model for v in verdict.votes] == ["model-a", "model-c"]
-    assert (verdict.technique, verdict.agreement, verdict.n_models) == ("doubt", 2, 3)
+    assert (verdict.technique, verdict.agreement, verdict.n_models) == ("no_technique", 0, 3)
+    assert verdict.disputed is True
     assert list(tmp_path.glob("*.json")) == []  # transient failure is not cached
 
 

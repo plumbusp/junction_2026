@@ -2,7 +2,7 @@
 //
 // Required element IDs (the smoke check relies on these):
 //   mock-banner, masthead-date, radio-toggle, game, step-indicator, game-status, game-error,
-//   step-headlines, board-strings, round-event, round-note, headline-list, start-btn,
+//   step-headlines, board-strings, round-date, round-event-line, round-event, round-note, headline-list, start-btn,
 //   track-record, track-record-body,
 //   step-examine, examine-outlet, technique-form, word-headline, words-hint, words-selected, words-clear,
 //   technique-options, submit-answer,
@@ -117,8 +117,12 @@ async function loadRound() {
 
 function renderHeadlines() {
   const r = state.round;
-  $("round-event").textContent = r.event || "One event, three outlets";
-  $("round-note").textContent = [r.date, r.source_note].filter(Boolean).join(" · ");
+  // Older rounds carry a keyword list instead of a written title: show no story line then.
+  const story = r.event && !/^keywords:/i.test(r.event) ? r.event : "";
+  $("round-event").textContent = story;
+  $("round-event-line").hidden = !story;
+  $("round-date").textContent = r.date || "today";
+  $("round-note").textContent = r.source_note || "";
   const list = $("headline-list");
   list.textContent = "";
   r.items.forEach((item, i) => {
@@ -188,7 +192,9 @@ async function loadTrackRecord() {
   try {
     const data = await api("GET", "/api/metrics");
     const sources = data && data.sources ? data.sources : {};
-    const key = Object.keys(sources).find((k) => sources[k] && sources[k].n > 0);
+    // Prefer the source closest to the product: human-labelled news headlines first.
+    const preferred = ["ptc_headlines", ...Object.keys(sources)];
+    const key = preferred.find((k) => sources[k] && sources[k].n > 0);
     body.textContent = "";
     if (!key) {
       body.append(el("p", { text: "No measured results have been published yet." }));
