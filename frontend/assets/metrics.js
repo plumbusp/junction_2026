@@ -135,7 +135,7 @@ function renderPolicies(key, src) {
     el("th", { scope: "col", class: "num", text: "95% Wilson" }), el("th", { scope: "col", text: "Recall 0% to 100%" })];
   return el("section", {},
     el("h3", { text: "False-positive trade-off" }),
-    el("p", { class: "small", text: "Flagging only at High confidence wrongly accuses fewer honest texts, but also misses more manipulation. Recall here counts a text with any technique as found if the system flagged any technique." }),
+    el("p", { class: "small", text: "Our default flags a text only when all three models agree: it wrongly accuses fewer honest texts than the looser two-of-three rule, but misses more manipulation. Both rules are computed from the same votes. Recall here counts a text with any technique as found if the system flagged any technique." }),
     table(`policies-${key}`, "False-positive rate versus recall for two flagging rules", head, rows));
 }
 

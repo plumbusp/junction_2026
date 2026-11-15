@@ -15,6 +15,7 @@ Datasets for Spot the Spin. Honesty rules: `docs/RULES.md`, section 3. Record fo
 | `staging/eval_v1_candidate/` | **unfrozen** eval candidate from the upstream test split, with `manifest.json` | no (gitignored) |
 | `eval/eval_v1/` | frozen: SemEval-2021 Task 6 test split, 135 texts | yes |
 | `eval/eval_v2/` | frozen: `eval_v1` texts unchanged plus 70 real headlines (`headlines_llm`, labelled by one LLM annotator, not humans; a stopgap until two human annotators label a gold set) | yes |
+| `eval/eval_v3/` | frozen: `eval_v2` files unchanged plus `ptc_headlines.jsonl`, 332 news article titles from PTC (SemEval-2020 Task 11) with **human** labels; the current test set | yes |
 
 ## Sources and licence
 

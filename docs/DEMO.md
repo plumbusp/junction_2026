@@ -1,7 +1,7 @@
 # Demo script: no i am not brainwashed (3 to 4 minutes)
 
-Live URL: https://srv2160832.hstgr.cloud (see `docs/STATUS.md`). Numbers below are quoted from
-`backend/eval/results/latest.json` (test set `eval_v2`, prompt v4; see `run_at` in the file). If a
+Live URL: https://iamnotbrainwashed.tech (the old https://srv2160832.hstgr.cloud still works; see `docs/STATUS.md`). Numbers below are quoted from
+`backend/eval/results/latest.json` (test set `eval_v3`, prompt v4; see `run_at` in the file). If a
 newer eval run is published before the demo, re-read the page and update this file: never quote a
 number the page does not show.
 
@@ -93,23 +93,28 @@ rule "accuse only at 3 of 3".
 
 ## Q&A cheat sheet (honest answers)
 
-> Numbers in this section were written for eval_v2 (2-of-3 rule, gpt-5.4-nano in the ensemble). For current numbers use section 4 or the live /metrics page.
+Numbers: eval_v3, prompt v4, claude-haiku-5.5 + deepseek-v4.1-flash + gemini-3.7-flash, accuse only at
+3 of 3. "PTC" is the 332 human-labelled news headlines.
 
-**Why three models?** One model's confidence says little about whether it is right. Three different
-vendors voting gives a usable agreement signal: the calibration table shows accuracy falling from
-3 of 3 to 2 of 3 to disputed. When no two agree, the text is marked "Disputed" and never shown as a
-confident verdict. On the headline set the ensemble also cut false positives: one of the three models
-alone flagged 10 of 37 clean headlines, the ensemble flagged 1 of 37.
+**Why three models?** One model's confidence says little about whether it is right. Three vendors voting
+gives an agreement signal, and on PTC the ensemble beats every single model on both counts: accuracy
+72.3% against 67.1% (claude-haiku), 65.7% (gemini) and 61.6% (deepseek); honest headlines accused 21%
+(53 of 250) against 31%, 36% and 42% for the models alone. The per-model table is in Methodology.
 
-**Does the ensemble beat the best single model?** Not always, and we show it. On the headline set one
-single model (deepseek-v4.1-flash) has 82.9% accuracy against the ensemble's 78.6%; on SemEval the
-ensemble is the best (61.5% against 54.8% to 59.3%). The per-model table is in Methodology. The
-ensemble's value is the agreement signal and the lower false-positive rate, not a higher headline score.
+**Does the ensemble always beat the best single model?** No, and we show it. On the LLM-labelled
+headlines deepseek alone has 85.7% accuracy against the ensemble's 72.9%: the strict rule drops every
+2-of-3 call there. On SemEval deepseek alone is 60.9% against 59.3%. The ensemble's value is the
+agreement signal and far fewer false accusations (SemEval: 1 of 41 against 11 to 19 of 41).
 
-**Why cheap models?** A team decision for cost: a public Analyze button costs three model requests per
-call. The models (claude-haiku-5.5, gpt-5.4-nano, deepseek-v4.1-flash) were chosen by price and vendor
-family, not by eval results. The earlier run with the more expensive models is in git history. We do
-not claim the cheap choice is optimal.
+**Why accuse only at 3 of 3?** A false accusation costs more than a miss. On PTC the 2-of-3 rule accuses
+34% of honest headlines and catches 87% of manipulative ones; 3 of 3 accuses 21% and catches 66%. Both
+rows are on the page. The rule and the model swap (gemini-3.7-flash for gpt-5.4-nano) were chosen on
+dev data (seven candidate models, every trio scored offline), then the frozen test was run once. On dev
+the swap gain was within noise; we say so.
+
+**Why cheap models?** Cost: a public Analyze button costs three model requests per call. On dev, the
+expensive claude-sonnet-5.5 alone flagged more clean texts than claude-haiku, so price did not buy
+precision here. We do not claim the cheap choice is optimal.
 
 **How do the data change the detector?** The detector is still prompted LLMs, not a trained model. What
 the labelled data do: (1) the frozen test sets measure it; (2) the development set (527 meme texts plus
@@ -117,7 +122,7 @@ the labelled data do: (1) the frozen test sets measure it; (2) the development s
 each text the prompt gets 14 fixed anchors plus the 4 most similar labelled dev examples (TF-IDF
 similarity, news headlines preferred). On dev, leave-one-out (each dev text scored without itself),
 retrieval against anchors only: accuracy 81.5% to 85.2%, macro-F1 0.58 to 0.53, same false-positive
-rate. On the frozen test sets, measured once: headlines accuracy 78.6% to 78.6% (unchanged) and macro-F1
+rate. On the frozen eval_v2 test sets (before the 3-of-3 rule), measured once: headlines accuracy 78.6% to 78.6% (unchanged) and macro-F1
 0.30 to 0.39; SemEval accuracy 60.7% to 61.5%, macro-F1 0.33 to 0.37, but false positives 7 of 41 to 10
 of 41. Honest summary: no clear gain; all intervals overlap. We keep retrieval because it is the
 data-driven route and macro-F1 rose on both sources, and we say plainly that it is not proven better.
@@ -129,31 +134,35 @@ headlines (same event, different outlet), so retrieval could have shown the mode
 them from dev, replaced one prompt anchor, and measured again: the gain vanished. This is exactly why the
 frozen test set matters, and it is the honest version of the numbers above.
 
-**Is there leakage?** Two separate risks. (1) Our own pipeline: the test sets were frozen before any
+**Is there leakage?** Two separate risks. PTC itself was never used for tuning: no PTC text is in dev or
+in the prompt (overlap check: 0). (1) Our own pipeline: the test sets were frozen before any
 prompt tuning, few-shot examples come only from the development set, and dev and test are checked for
 duplicates on normalized text, and also for same-story near-duplicates by content-word overlap (that
 second check found 11 in our first dev set; they were removed, see the question about the first result
 above). Confirmed player disputes go to dev only. (2) The models themselves: the
 public datasets may be in their training data, which can inflate scores. We cannot rule that out and
-the page says so. The real-headline source (fetched 2026-11-14) is the least exposed.
+the page says so. PTC is public since 2019, so this risk is real for it; the RSS headlines fetched
+2026-11-14 are the least exposed.
 
-**Domain shift?** Yes. SemEval-2021 Task 6 is meme text. The real-headline set is in the right domain but
-LLM-labelled. Neither is a perfect measurement of "labelling a news headline"; together they bracket it.
+**Domain shift?** PTC is the right domain with human labels, but its articles are from 2017-2019 and
+lean partisan; its annotators labelled titles inside whole articles and left some plainly loaded titles
+unmarked ("The Cunning CIA", "Bombshell ..."), so part of our 21% is label noise. We did not relabel.
+SemEval-2021 is meme text; the newest headlines are LLM-labelled. Each source is shown separately.
 
-**Is n = 135 or 70 enough?** No, it is small, and every number carries a Wilson interval for that
-reason. Per technique it is much smaller: for example appeal to fear has 2 examples in SemEval and 3 in
-the headline set. The rare techniques are mostly not detected on the headline set (appeal to fear 0 of 3,
-exaggeration 0 of 4, doubt 0 of 4, changing the subject 0 of 1; appeal to authority 1 of 1). Loaded
-language is the one technique we detect well (18 of 20).
+**Is n enough?** PTC has 332 headlines (250 clean), so the false-accusation rate has a usable
+interval (17% to 27%). Per technique it is small: on PTC appeal to fear 3, exaggeration 3, doubt 7,
+appeal to authority 1, changing the subject 1. Loaded language is the one technique we detect well
+(40 of 67 on PTC); the rare ones are mostly missed under the strict rule (doubt 1 of 7).
 
 **What is not measured?** A human ceiling (no second annotator, so no Cohen's kappa); techniques outside
 our six (excluded, not counted); long articles (we test headlines and short texts); precision of
-span highlighting beyond token-F1 (0.34 on SemEval, 0.42 on headlines, both with wide intervals);
-anything about bots or coordinated accounts.
+span highlighting beyond token-F1 (0.37 on PTC, 0.61 when the technique is right); anything about bots
+or coordinated accounts.
 
-**Why is the daily round often mild?** We measured it: on real news the cheap ensemble labels about 96%
-of headlines as "no technique" (50 of 52 cached verdicts when we checked). We did not make the prompt
-bolder to get variety, because that would trade variety for false positives and need a new evaluation.
+**Why is the daily round often mild?** Most real headlines are plain, and the strict 3-of-3 rule makes
+the detector accuse fewer of them. The daily job still requires at least one headline with a technique
+when the day's pool has one. We did not loosen the rule to get variety: that trades variety for false
+accusations.
 
 **What would you do with two human annotators?** Label a gold set of 150 to 200 real headlines from our
 own pipeline, independently, before seeing any model output, with about 35 to 40% "no technique". Compute
@@ -179,7 +188,12 @@ again (cached texts still count toward the daily cap), and a size limit on texts
   daily challenge can be played once per browser, and the closed edition is shown afterwards.
 - [ ] Key balance: check the Hostinger AI Router balance. Cached verdicts replay for free, but a new
   Analyze text costs three model requests.
-- [ ] Analyze: run your chosen article once beforehand so the live answer is instant.
+- [ ] Analyze: run your chosen texts once beforehand so the live answer is instant. Checked and cached on
+  2026-11-15 (paste exactly, typographic quotes included): "Kentucky couple’s dream home turns into
+  snake-infested house of horrors" (loaded language, 3 of 3); "Confirmed: Authorities LIED About Las Vegas
+  Shooter’s Hotel Check-In Date – What Else Are They Hiding?" (doubt, 3 of 3); "US flights chaos sparks UK
+  travel misery amid cancellations after FAA ground stop" (2 of 3, not accused); "US bloggers banned from
+  entering UK" (no technique, 3 of 3).
 - [ ] /metrics shows the "live" run, not a stub banner, and the numbers match this file.
 - [ ] Human vs model section: either empty (say so) or show real counts. Do not create fake disputes.
 - [ ] Radio is off (the masthead toggle shows "off"; the choice is remembered per browser).

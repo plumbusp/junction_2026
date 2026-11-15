@@ -46,12 +46,14 @@ class ModelVote:
 
 @dataclass
 class Verdict:
-    technique: str             # majority vote; "no_technique" if no majority
+    technique: str             # a technique only when all 3 models name it (ACCUSE_MIN_VOTES);
+                               # "no_technique" when 2+ say clean, on a near-miss or with no majority
     evidence_spans: list[str]  # spans chosen by >= 2 models
-    explanation: str           # plain language, from a model that voted with the majority
+    explanation: str           # plain language, from a model in the majority; on a near-miss
+                               # it says "2 of 3 models saw <technique> ... not accused"
     agreement: int             # how many models voted for `technique` (0..3)
     n_models: int              # usually 3
-    disputed: bool             # True when agreement < 2 — not shown as a confident verdict
+    disputed: bool             # True on a near-miss or no majority — not shown as a confident verdict
     votes: list[ModelVote]
 
 def classify(text: str) -> Verdict: ...

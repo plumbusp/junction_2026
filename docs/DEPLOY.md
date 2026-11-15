@@ -32,7 +32,8 @@ Compose variables (set in the server `.env`, which is also passed with `--env-fi
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PUBLIC_DOMAIN` | `srv2160832.hstgr.cloud` | `Host()` rule of the router |
+| `PUBLIC_DOMAIN` | `iamnotbrainwashed.tech` | main `Host()` rule of the router |
+| `LEGACY_DOMAIN` | `srv2160832.hstgr.cloud` | also routed, so older links keep working |
 | `APP_ENV_FILE` | `/opt/spotthespin/app/.env` | the app's environment file |
 | `APP_IMAGE` / `APP_TAG` | `spotthespin-app` / `latest` | image; `deploy.sh` sets `APP_TAG` to the git sha |
 
@@ -123,7 +124,7 @@ List what can be rolled back to: `docker images spotthespin-app` and `ls /opt/sp
 ## After deploying (read-only checks)
 
 1. `docker ps --filter name=spotthespin-app-1` shows `(healthy)`.
-2. From the local machine: `bash .claude/skills/run-app/scripts/smoke.sh https://srv2160832.hstgr.cloud`. It only sends GET requests and one neutral POST to `/api/analyze`.
+2. From the local machine: `bash .claude/skills/run-app/scripts/smoke.sh https://iamnotbrainwashed.tech`. It only sends GET requests and one neutral POST to `/api/analyze`.
 3. The browser shows a valid Let's Encrypt certificate, not `TRAEFIK DEFAULT CERT`.
 4. `/health` (or `/api/health`) answers 200 on the public URL.
 
