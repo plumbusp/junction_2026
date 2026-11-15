@@ -1,6 +1,6 @@
 # Demo script: no i am not brainwashed (3 to 4 minutes)
 
-Live URL: https://srv2160832.hstgr.cloud (see `docs/STATUS.md`). Numbers below are quoted from
+Live URL: https://iamnotbrainwashed.tech (the old https://srv2160832.hstgr.cloud still works; see `docs/STATUS.md`). Numbers below are quoted from
 `backend/eval/results/latest.json` (test set `eval_v3`, prompt v4; see `run_at` in the file). If a
 newer eval run is published before the demo, re-read the page and update this file: never quote a
 number the page does not show.

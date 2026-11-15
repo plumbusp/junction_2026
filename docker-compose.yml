@@ -6,7 +6,8 @@
 #
 # Interpolated variables (values come from the file passed with --env-file, or
 # from the shell; defaults shown):
-#   PUBLIC_DOMAIN    srv2160832.hstgr.cloud          Host() rule of the router
+#   PUBLIC_DOMAIN    iamnotbrainwashed.tech          main Host() rule of the router
+#   LEGACY_DOMAIN    srv2160832.hstgr.cloud          also served, so older links keep working
 #   APP_ENV_FILE     /opt/spotthespin/app/.env       app environment (secrets)
 #   APP_IMAGE        spotthespin-app                 image name
 #   APP_TAG          latest                          image tag (git sha on deploy)
@@ -41,7 +42,7 @@ services:
         max-file: "3"
     labels:
       - traefik.enable=true
-      - traefik.http.routers.spotthespin.rule=Host(`${PUBLIC_DOMAIN:-srv2160832.hstgr.cloud}`)
+      - traefik.http.routers.spotthespin.rule=Host(`${PUBLIC_DOMAIN:-iamnotbrainwashed.tech}`) || Host(`${LEGACY_DOMAIN:-srv2160832.hstgr.cloud}`)
       - traefik.http.routers.spotthespin.entrypoints=websecure
       - traefik.http.routers.spotthespin.tls.certresolver=letsencrypt
       - traefik.http.services.spotthespin.loadbalancer.server.port=8000

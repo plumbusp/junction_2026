@@ -6,7 +6,7 @@
 
 SSH_TARGET="${DEPLOY_SSH_TARGET:-deploy@srv2160832.hstgr.cloud}"
 APP_DIR="${DEPLOY_APP_DIR:-/opt/spotthespin/app}"
-PUBLIC_URL="${DEPLOY_PUBLIC_URL:-https://srv2160832.hstgr.cloud}"
+PUBLIC_URL="${DEPLOY_PUBLIC_URL:-https://iamnotbrainwashed.tech}"
 # Extra ssh options, for example: DEPLOY_SSH_OPTS="-i ~/.ssh/id_ed25519"
 read -r -a SSH_OPTS <<< "${DEPLOY_SSH_OPTS:-}"
 

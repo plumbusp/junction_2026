@@ -35,7 +35,7 @@ Compose publishes no ports in production, so for local checks use the override d
 
 ### 3. Public, read-only (only when the orchestrator or the user asks)
 ```
-bash .claude/skills/run-app/scripts/smoke.sh https://srv2160832.hstgr.cloud
+bash .claude/skills/run-app/scripts/smoke.sh https://iamnotbrainwashed.tech
 ```
 This only sends GET requests, plus one POST to `/api/analyze` with a short neutral sentence. It does not change anything on the server. Do not run any `ssh` command from this skill.
 

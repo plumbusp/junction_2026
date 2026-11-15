@@ -6,10 +6,10 @@ A daily game and an open detector for manipulation techniques in news headlines,
 and its mistakes measured in public. Built in one weekend at Junction 2026 for Hostinger's
 "Decode the Noise" challenge, and running live on Hostinger.
 
-**Live:** [srv2160832.hstgr.cloud](https://srv2160832.hstgr.cloud) ·
-[Play today’s round](https://srv2160832.hstgr.cloud) ·
-[Analyze a text](https://srv2160832.hstgr.cloud/analyze/) ·
-[Track record](https://srv2160832.hstgr.cloud/metrics/)
+**Live:** [iamnotbrainwashed.tech](https://iamnotbrainwashed.tech) ·
+[Play today’s round](https://iamnotbrainwashed.tech) ·
+[Analyze a text](https://iamnotbrainwashed.tech/analyze/) ·
+[Track record](https://iamnotbrainwashed.tech/metrics/)
 
 ![The Board: today's three headlines about one story](docs/img/board.png)
 
