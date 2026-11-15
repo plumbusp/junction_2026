@@ -21,7 +21,7 @@ def test_majority_wins_with_spans_shared_by_two_majority_models() -> None:
         vote("c", "appeal_to_fear", ["rip-off"], "Fear."),
     ]
 
-    verdict = aggregate(votes, n_models=3)
+    verdict = aggregate(votes, n_models=3, min_accuse=2)
 
     assert verdict.technique == "loaded_language"
     assert verdict.agreement == 2
@@ -66,3 +66,39 @@ def test_validate_spans_drops_invented_and_altered_spans() -> None:
     )
 
     assert kept == ["Experts say", "rip-off"]
+
+
+def test_two_of_three_is_not_enough_to_accuse_by_default() -> None:
+    votes = [
+        vote("a", "loaded_language", ["slams"], "Charged words."),
+        vote("b", "loaded_language", ["slams"], "Emotional verb."),
+        vote("c", "no_technique", [], "Neutral."),
+    ]
+
+    verdict = aggregate(votes, n_models=3)
+
+    assert (verdict.technique, verdict.disputed, verdict.agreement) == ("no_technique", True, 1)
+    assert verdict.evidence_spans == []
+    assert "2 of 3 models saw loaded language" in verdict.explanation
+    assert verdict.votes == votes
+
+
+def test_three_of_three_accuses() -> None:
+    votes = [vote(m, "doubt", ["really?"], "Doubt.") for m in "abc"]
+
+    verdict = aggregate(votes, n_models=3)
+
+    assert (verdict.technique, verdict.agreement, verdict.disputed) == ("doubt", 3, False)
+    assert verdict.evidence_spans == ["really?"]
+
+
+def test_two_of_three_saying_clean_is_a_clean_verdict() -> None:
+    votes = [
+        vote("a", "no_technique", [], "Neutral."),
+        vote("b", "no_technique", [], "Neutral."),
+        vote("c", "doubt", [], "Doubt."),
+    ]
+
+    verdict = aggregate(votes, n_models=3)
+
+    assert (verdict.technique, verdict.agreement, verdict.disputed) == ("no_technique", 2, False)

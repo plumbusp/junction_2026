@@ -57,10 +57,17 @@
       <div class="board">
         <svg id="board-strings" class="board-strings" aria-hidden="true" focusable="false"></svg>
         <div class="case-card paper">
-          <p class="typewriter small-caps">Case file · today's event</p>
-          <h2 id="h-headlines"><span id="round-event"></span></h2>
+          <p class="typewriter small-caps">Daily media-literacy game · <span id="round-date"></span></p>
+          <h2 id="h-headlines">Three real headlines. Find the spin.</h2>
+          <p id="round-event-line" class="small" hidden>Today's story: <strong id="round-event"></strong></p>
+          <ol class="rules small">
+            <li><strong>Read</strong> three headlines about one story, pulled this morning from real outlets.</li>
+            <li><strong>Name the trick</strong> in each one, or say there is none.</li>
+            <li><strong>Click the words</strong> that give it away.</li>
+            <li><strong>Compare</strong> with our detector: three AI models vote, and a headline is accused only when all three agree.</li>
+          </ol>
+          <p class="small rules-score">60 points for the right technique, up to 40 for the right words.</p>
           <p id="round-note" class="typewriter small"></p>
-          <p class="small">Three outlets, one event. Examine each clipping: name the technique (or "no technique") and mark the words that give it away. Then compare with the system's reference answer.</p>
           <div class="btn-row">
             <button type="button" id="start-btn" class="btn">Examine clipping 1</button>
           </div>

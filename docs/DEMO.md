@@ -42,35 +42,35 @@ mistakes, sample sizes and false-positive rate on display.
 
 ### 4. /metrics walk-through (about 70 s)
 
-Open "Track record". Say that two sources are shown, separately, and never merged into one number.
+Open "Track record". Say that three sources are shown, separately, and never merged into one number.
+Numbers: eval_v3, prompt v4, models claude-haiku-5.5 + deepseek-v4.1-flash + gemini-3.7-flash,
+rule "accuse only at 3 of 3".
 
 - Honest numbers: every figure shows its n and a 95% Wilson interval (the error bar).
-- **SemEval-2021 Task 6 (meme texts, human-annotated upstream), n = 135:** accuracy 61.5% (83 of 135,
-  interval 53.1% to 69.3%); macro-F1 0.37.
-- **Real news headlines, labelled by one LLM annotator (not human), n = 70:** accuracy 78.6% (55 of 70,
-  interval 67.6% to 86.6%); macro-F1 0.39.
-- **False-positive rate on "no technique"**, the number the tile highlights: how often an honest text
-  is wrongly accused. SemEval 10 of 41 = 24.4% (13.8% to 39.3%). Headlines 1 of 37 = 2.7%
-  (0.5% to 13.8%).
-- **Trade-off table:** on SemEval, flagging only at 3 of 3 models cuts false positives from 10 of 41
-  (24.4%) to 3 of 41 (7.3%), while recall of "any technique" drops from 80.8% (76 of 94) to 46.8%
-  (44 of 94). On the headlines the single false positive disappears (1 of 37 to 0 of 37), and recall
-  drops from 69.7% (23 of 33) to 45.5% (15 of 33).
-- **Calibration:** accuracy by confidence level. SemEval: 3 of 3 = 74.3% (52 of 70), 2 of 3 = 49.1%
-  (28 of 57), disputed = 37.5% (3 of 8). Headlines: 3 of 3 = 90.5% (38 of 42), 2 of 3 = 77.3%
-  (17 of 22), disputed = 0% (0 of 6). Accuracy falls as agreement falls, so the confidence label
-  carries information.
-- **The two sources and why they are separate:** SemEval has human annotators but is meme text, not
-  news. The headline set is the right domain but its labels come from one LLM annotator, so
-  "LLM-annotated, not human" is stated on the page: unknown label noise, no human ceiling (no
-  Cohen's kappa), and the annotator and the classifier are both general-purpose LLMs, so their
-  errors may be correlated. It is a stopgap until two humans label a gold set.
+- **Lead with the hardest source: real news headlines annotated by humans (PTC, SemEval-2020
+  Task 11), n = 332.** Accuracy 72.3% (240 of 332, 67.2% to 76.8%). Honest headlines wrongly
+  accused: 53 of 250 = 21.2% (16.6% to 26.7%). Say: "This is the set we did not pick or label
+  ourselves, and it is the one where we look worst."
+- **Why the rule is 3 of 3:** a false accusation costs more than a miss. On PTC the looser 2-of-3
+  rule would accuse 85 of 250 = 34% of honest headlines while catching 87% of manipulative ones;
+  3 of 3 accuses 21% and catches 66% (54 of 82). Both rows are in the trade-off table, computed
+  from the same votes. The rule and the model swap were chosen on dev data, then the frozen test
+  was run once.
+- **SemEval-2021 (meme texts, human), n = 135:** wrongly accused 1 of 41 = 2.4% (0.4% to 12.6%);
+  accuracy 59.3% (80 of 135). **Headlines labelled by one LLM (not human), n = 70:** wrongly
+  accused 0 of 37 (0% to 9.4%); accuracy 72.9% (51 of 70).
+- **Calibration:** accuracy by agreement level. PTC: all three agree 72.4% (178 of 246). SemEval:
+  all three agree 79.7% (55 of 69), disputed 24.4% (11 of 45). Headlines: 88.9% (48 of 54) at
+  3 of 3, 14.3% (1 of 7) disputed.
+- **Why PTC looks harder:** PTC annotators labelled titles inside whole articles and left many
+  plainly loaded titles unmarked ("The Cunning CIA", "Bombshell ...", "A Slap On The Wrist"), so
+  part of that 21% is label noise. We did not relabel anything; the caveat is on the page.
 - **Human vs model section:** counts only (disputes per answer, status, which reference techniques are
   disputed most, which technique players proposed instead), always with n. If nobody has disputed
   yet, it says so. Disputes are opinions, not labels.
-- Known limitations are on the page: meme-to-headline domain shift, possible training-data leakage,
-  techniques outside our six are excluded rather than counted as "no technique", small n per
-  technique. Methodology (collapsed) shows the three model IDs and the single-model comparison.
+- Known limitations are on the page: domain shift (memes, 2017-2019 articles), possible training-data
+  leakage, techniques outside our six are excluded rather than counted as "no technique", small n per
+  technique, and a strict rule that misses about a third of manipulative headlines.
 
 ### 5. Analyze on a live article (about 40 s)
 
@@ -92,6 +92,8 @@ Open "Track record". Say that two sources are shown, separately, and never merge
 - After the last clipping the board shows the closed edition and the time of the next one.
 
 ## Q&A cheat sheet (honest answers)
+
+> Numbers in this section were written for eval_v2 (2-of-3 rule, gpt-5.4-nano in the ensemble). For current numbers use section 4 or the live /metrics page.
 
 **Why three models?** One model's confidence says little about whether it is right. Three different
 vendors voting gives a usable agreement signal: the calibration table shows accuracy falling from

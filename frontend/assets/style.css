@@ -421,6 +421,10 @@ input[type="radio"] { accent-color: var(--oxblood); }
 }
 .case-card h2 { margin: 4px 0 8px; font-size: 1.6rem; }
 .case-card p { margin: 6px 0; max-width: 65ch; }
+.case-card .rules { margin: 10px 0 6px; padding-left: 1.4em; max-width: 62ch; }
+.case-card .rules li { margin: 3px 0; }
+.case-card .rules-score { font-style: italic; }
+#round-date { white-space: nowrap; }
 .clippings {
   grid-column: 1 / -1;
   display: grid;
