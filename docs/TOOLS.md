@@ -11,8 +11,8 @@ Written for: the team. Status: **confirmed** (checked on a machine or in the acc
 | Free Hostinger domain | public URL for the judges | received | name in `.env` (`PUBLIC_DOMAIN`) |
 | Hostinger connector / API / CLI | manage the VPS and DNS from the editor (Claude Code, MCP) | proposed | docs.hostinger.com/hostinger-connector, developers.hostinger.com |
 | Hostinger MCP server | the same functions through MCP | proposed | github.com/hostinger/api-mcp-server |
-| Docker + docker compose | packaging the application | proposed | Dockerfile not written yet |
-| Caddy | HTTPS on the VPS | proposed | not finally chosen (Traefik already serves HTTPS on the VPS) |
+| Docker + docker compose | packaging the application | confirmed | `Dockerfile`, `docker-compose.yml`; image built on the VPS by `deploy/deploy.sh` |
+| Caddy | HTTPS on the VPS | not used | Traefik already serves HTTPS on the VPS |
 
 ## Local machine
 
@@ -29,13 +29,13 @@ How the environment is set up on a particular machine is not described in the re
 
 | Layer | Tool | Status |
 |---|---|---|
-| Backend | Python 3.12, FastAPI | proposed |
-| Database | SQLite (rounds, answers, disputes) | proposed |
-| Classifier | Hostinger AI Router, three models, OpenAI-compatible client | proposed |
-| Tests | pytest | proposed |
-| Frontend | plain HTML/JS without a build step | proposed |
-| News collection | RSS, clustering by embeddings | proposed |
-| Text extraction from URLs | trafilatura | proposed |
+| Backend | Python 3.12, FastAPI, uvicorn | confirmed |
+| Database | SQLite (rounds, answers, disputes) | confirmed |
+| Classifier | Hostinger AI Router, three models (claude-haiku-5.5, deepseek-v4.1-flash, gemini-3.7-flash), OpenAI-compatible client | confirmed |
+| Tests | pytest | confirmed |
+| Frontend | plain HTML/CSS/JS without a build step | confirmed |
+| News collection | RSS (feedparser) from 35 outlets, TF-IDF cosine clustering | confirmed |
+| Text extraction from URLs | trafilatura | confirmed |
 
 ## Secrets and access
 

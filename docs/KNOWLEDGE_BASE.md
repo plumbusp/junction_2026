@@ -80,7 +80,7 @@ Counts on the upstream test split (n=200): 41 no technique, 94 single technique 
 
 | Source | What | Status |
 |---|---|---|
-| PTC, SemEval-2020 Task 11 | news articles, span-level labels, 14 techniques | registration required: propaganda.qcri.org/ptc/registration.php. Status not confirmed |
+| PTC, SemEval-2020 Task 11 | news articles, span-level labels, 14 techniques | **open on Zenodo (record 3952415, `datasets-v2.tgz`), CC BY 4.0, no registration**. Train-article titles are the eval source `ptc_headlines` in `eval_v3` (332 headlines, human labels); converter `scripts/data/ptc_headlines_convert.py` |
 | SemEval-2023 Task 3 (subtask 3) | English news paragraphs, ~19 techniques | registration open. Status not confirmed |
 | SemEval-2021 Task 6 | meme texts, 22 techniques, span labels; 688 train / 63 dev / 200 test, gold test labels public | **available without registration**: github.com/di-dimitrov/SEMEVAL-2021-task6-corpus, licence "free for general research use". Downloaded 2026-11-14 to `data/raw/semeval2021_task6/` (gitignored, not committed). Source tag `semeval21` |
 | Own gold set of real headlines | 150–200 headlines from RSS, labelled by two people | **not created**. The repository has no `data/` yet |
@@ -96,7 +96,7 @@ Important: the repository has no `data/eval/` yet. There is no frozen test set; 
 
 ## 7. Open questions
 
-- Confirm the PTC registration and the status of SemEval-2023.
+- PTC: resolved (open on Zenodo, used in eval_v3). SemEval-2023 status still not confirmed.
 - Find a second annotator for the gold set.
 - Confirm the AI Router base URL in the panel, and the list of available models (done: the list was retrieved and three models were verified).
 - Decide whether Hostinger AI Builder is used for the frontend or the frontend is written by hand.

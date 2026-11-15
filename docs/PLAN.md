@@ -1,6 +1,6 @@
 # Spot the Spin — project plan (Junction 2026, Hostinger challenge)
 
-Seed copy used to bootstrap `docs/PLAN.md`. Once `docs/PLAN.md` exists, it is the source of truth.
+Original plan from 14 November. Some decisions changed since (PTC is open on Zenodo and used in eval_v3; a text is accused only when all three models agree); the current state and every change are in [STATUS.md](STATUS.md).
 
 ## Context
 
